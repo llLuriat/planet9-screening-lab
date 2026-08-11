@@ -8,8 +8,8 @@ Este projeto não determina a órbita real do Planeta 9.
 
 O que passou a existir de verdade nesta revisão:
 
-- `configs/budgets/secular.yaml`: horizonte de integração em escala Myr (1e8 anos
-  como ponto de partida conservador; NÃO 4e9 ainda - ver abaixo) com timestep
+- `configs/budgets/secular.yaml`: horizonte de integração em escala Gyr (4e9
+  anos, validado via benchmark de hardware - ver abaixo) com timestep
   derivado fisicamente do período orbital de Júpiter (`P/20`), não um número
   chutado. A derivação é feita em código
   (`planet9lab.physics.recommended_timestep_years`) e um teste garante que o
@@ -27,16 +27,17 @@ O que passou a existir de verdade nesta revisão:
 
 O que ainda NÃO está resolvido e precisa ser honesto no artigo:
 
-- **`integration_years: 1e8` em `secular.yaml` ainda não foi validado contra o
-  hardware real que vai rodar o pipeline.** `scripts/benchmark_integration_cost.py`
-  existe para medir isso (tempo de parede real por candidato), mas só pode ser
-  executado numa máquina com REBOUND instalado e tempo disponível - não
-  neste ambiente de desenvolvimento (sem rede, sem REBOUND). Enquanto
-  `results/hardware_benchmark.json` não existir, `integration_years` é uma
-  escolha conservadora de ponto de partida, não um valor testado. Se ao rodar
-  o benchmark 4e9 anos (ou mesmo 1e9) não couber no orçamento de tempo
-  disponível, o artigo deve reportar o maior valor efetivamente executado, não
-  o valor originalmente pedido.
+- **`integration_years: 4e9` em `secular.yaml` foi validado via
+  `scripts/benchmark_integration_cost.py` (11/08/2026), rodado na máquina de
+  desenvolvimento: ~12.4h por par de controle, ~62h (2.6 dias) para o
+  conjunto completo de 7 candidatos, dentro do orçamento assumido de 48h por
+  par. Ver `results/hardware_benchmark.json`. IMPORTANTE: a run de produção
+  vai rodar numa máquina diferente (mais rápida) da que gerou esse benchmark
+  — os números acima são um limite conservador (a máquina de produção deve
+  performar igual ou melhor), não uma medição direta da máquina de produção.
+  Antes de citar tempos de execução no artigo, rodar
+  `scripts/benchmark_integration_cost.py` de novo na máquina de produção e
+  atualizar este texto com os números reais medidos ali.
 - Catálogo canônico ainda usa fixtures parciais.
 - Não há modelo completo de viés observacional.
 - Leave-one-out não é executado.
@@ -88,16 +89,20 @@ O que ainda NÃO está implementado, marcado explicitamente como
   profundidade/cobertura de surveys - o mesmo gap rastreado como
   `detectability_status` no item 5 do plano.
 
-**Custo computacional ainda não validado em hardware real.** Os valores padrão
-de `max_stage2_samples` (200) e `max_stage3_samples` (60) em
-`configs/montecarlo/parameter_space.yaml` são pontos de partida conservadores,
-não valores medidos no seu E3-1230 v2. Rode
-`scripts/benchmark_integration_cost.py` primeiro; se o tempo por candidato do
-estágio 3 for muito alto, reduza `max_stage3_samples` antes de rodar o scan
-completo com `n_points: 20000`, ou o comando pode ficar rodando por dias sem
-terminar o estágio 3.
-
-
+**`max_stage2_samples`/`max_stage3_samples` ainda não recalibrados com o
+throughput medido.** O benchmark de 11/08/2026 (ver seção acima) mede o custo
+por passo de integração, mas não decide sozinho quantos pontos amostrados o
+estágio 2 (1e6 anos cada) e o estágio 3 (4e9 anos cada, agora) cabem no
+orçamento de tempo disponível para um `montecarlo-scan` completo. Os valores
+padrão em `configs/montecarlo/parameter_space.yaml` (`max_stage2_samples: 200`,
+`max_stage3_samples: 60`) continuam sendo pontos de partida conservadores, não
+recalculados a partir do benchmark. Antes de rodar um scan completo com
+`n_points: 20000`, refazer essa conta com o throughput real da máquina de
+produção (302.485 timesteps/s medidos na máquina de desenvolvimento, ver
+`results/hardware_benchmark.json`) para decidir se esses limites continuam
+razoáveis ou precisam ser ajustados - especialmente `max_stage3_samples`,
+já que cada amostra do estágio 3 agora custa até 4e9 anos de integração em
+vez do valor menor originalmente assumido.
 
 Havia um pacote local `pytest/` na raiz do projeto que **sombreava** qualquer
 `pytest` real instalado (Python prioriza o diretório atual do projeto sobre

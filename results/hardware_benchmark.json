@@ -1,0 +1,45 @@
+{
+  "calibration_wall_seconds": 0.0111,
+  "calibration_years": 2000.0,
+  "measured_on": "2026-08-11T02:19:31Z",
+  "n_particles": 10,
+  "projections_by_horizon_years": {
+    "100000000.0": {
+      "days_for_full_candidate_set": 0.064,
+      "hours_for_full_candidate_set": 1.547,
+      "hours_per_branch": 0.155,
+      "hours_per_candidate_control_pair": 0.309
+    },
+    "1000000000.0": {
+      "days_for_full_candidate_set": 0.645,
+      "hours_for_full_candidate_set": 15.469,
+      "hours_per_branch": 1.547,
+      "hours_per_candidate_control_pair": 3.094
+    },
+    "2000000000.0": {
+      "days_for_full_candidate_set": 1.289,
+      "hours_for_full_candidate_set": 30.938,
+      "hours_per_branch": 3.094,
+      "hours_per_candidate_control_pair": 6.188
+    },
+    "4000000000.0": {
+      "days_for_full_candidate_set": 2.578,
+      "hours_for_full_candidate_set": 61.877,
+      "hours_per_branch": 6.188,
+      "hours_per_candidate_control_pair": 12.375
+    },
+    "500000000.0": {
+      "days_for_full_candidate_set": 0.322,
+      "hours_for_full_candidate_set": 7.735,
+      "hours_per_branch": 0.773,
+      "hours_per_candidate_control_pair": 1.547
+    }
+  },
+  "rebound_version": "5.1.1",
+  "recommendation_note": "recommended_integration_years is the largest tested horizon whose projected with_p9+without_p9 wall-clock time for ONE candidate stays within wall_clock_budget_hours_per_candidate_pair. This is a single-core, single-candidate estimate; running multiple candidates sequentially multiplies this linearly (see hours_for_full_candidate_set).",
+  "recommended_integration_years": 4000000000.0,
+  "simulated_years_per_second": 179568.676,
+  "steps_per_second": 302485.46,
+  "timestep_years": 0.593644,
+  "wall_clock_budget_hours_per_candidate_pair": 48.0
+}

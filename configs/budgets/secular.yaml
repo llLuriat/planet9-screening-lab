@@ -3,17 +3,20 @@
 # integration_years
 # ------------------
 # The article claims need 1e8-4e9 yr to validate long-term apsidal alignment.
-# We deliberately do NOT start at 4e9 here: this repository has not yet been
-# benchmarked on the machine that will actually run it (see
-# scripts/benchmark_integration_cost.py and results/hardware_benchmark.json,
-# generated after running that script). 1e8 yr (100 Myr) is the conservative
-# starting point of the range the plan allows. Once hardware_benchmark.json
-# exists, re-evaluate this value honestly: if 4e9 yr is not reachable in a
-# reasonable wall-clock budget on the available machine, keep the largest
-# value that is honest and say so explicitly in the article and in
-# docs/LIMITACOES.md - do not force a round number that was never actually run.
-integration_years: 100000000  # 1e8 yr = 100 Myr; raise only after benchmarking
-
+# Benchmarked via scripts/benchmark_integration_cost.py on 2026-08-11 (see
+# results/hardware_benchmark.json): 4e9 yr costs ~12.4h per candidate control
+# pair and ~62h (2.6 days) for the full 7-candidate set on the benchmark
+# machine, comfortably inside the 48h/pair budget the script assumes.
+#
+# NOTE ON HARDWARE: this benchmark ran on the development machine, not the
+# machine that will execute the production `screen` run (a faster machine,
+# per project notes). Since the benchmark machine already clears the 48h/pair
+# budget at 4e9 yr, a faster production machine is expected to do the same or
+# better - but this has NOT been independently re-measured on the production
+# machine. Before citing wall-clock numbers in the article, re-run
+# scripts/benchmark_integration_cost.py on the actual production machine and
+# update this comment + docs/LIMITACOES.md with those numbers instead.
+integration_years: 4000000000  # 4e9 yr, validated feasible per results/hardware_benchmark.json (see note above)
 # timestep_years
 # --------------
 # Derived, not guessed: dt = P_Jupiter / 20, where P_Jupiter is computed from
@@ -27,17 +30,14 @@ integration_years: 100000000  # 1e8 yr = 100 Myr; raise only after benchmarking
 # value programmatically from the giants catalog so this file and the code
 # cannot silently drift apart - a test asserts they match.
 timestep_years: 0.593644
-
 # checkpoint_interval_years
 # --------------------------
-# At 1e8 yr / 0.593644 yr per step ~= 1.68e8 timesteps per branch. On old
-# hardware (see the E3-1230 v2 note in scripts/benchmark_integration_cost.py)
-# this can run for hours to days. Checkpointing every 1e6 yr (~100 checkpoints
-# over the full run) bounds the amount of work lost to a crash/interruption to
-# at most ~1e6/1e8 = 1% of the run, while keeping checkpoint I/O overhead small
-# relative to integration cost.
+# At 4e9 yr / 0.593644 yr per step ~= 6.74e9 timesteps per branch. This is a
+# long-running integration; checkpointing every 1e6 yr (~4000 checkpoints over
+# the full run) bounds the amount of work lost to a crash/interruption to at
+# most ~1e6/4e9 = 0.025% of the run, while keeping checkpoint I/O overhead
+# small relative to integration cost.
 checkpoint_interval_years: 1000000
-
 seeds: [12345]
 integrator: whfast
 max_candidates: 7
