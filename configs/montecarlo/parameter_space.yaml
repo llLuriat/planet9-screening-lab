@@ -1,0 +1,63 @@
+# Parameter space for the Monte Carlo / quasi-Monte Carlo scan over
+# [M9, a9, e9, i9] (item 2 of the V1->V2 plan).
+#
+# Bounds are grounded in the Planet Nine literature, not guessed:
+#   - mass_earth [5, 20]: Brown & Batygin 2016 (arXiv:1603.05712) - the range of
+#     masses compatible with reproducing the observed KBO clustering.
+#   - a_au [380, 980]: Brown & Batygin 2016, same paper - semimajor axis range
+#     of allowed orbits confining KBOs with a > 380 AU. Brown & Batygin 2021
+#     narrow this further to a rising-then-declining distribution peaking near
+#     900 AU (a Frechet-shaped prior), but we use a uniform prior over the
+#     wider 2016 range here since "the Planet Nine hypothesis is agnostic to a
+#     formation mechanism ... thus a uniform prior in semimajor axis seems
+#     appropriate" (Brown & Batygin 2021, discussing exactly this choice).
+#   - e [0.1, 0.8]: wide enough to cover both the Brown & Batygin 2016 fiducial
+#     (e ~ 0.5-0.6 at a ~ 600-700 AU) and tighter-orbit / MMR-based solutions
+#     that favor lower a with higher e to keep perihelion in the 150-350 AU
+#     band (Millholland & Laughlin 2017 MMR analysis; Downey & Morbidelli 2020
+#     work near a9 ~ 400-980 AU). We do not hard-reject points whose perihelion
+#     falls outside 150-350 AU here; that is recorded as a diagnostic column
+#     (within_literature_perihelion_band) rather than a filter, since it is a
+#     preferred region from one specific study, not a hard physical bound.
+#   - i_deg [0, 40]: centered loosely around the ~30 deg fiducial inclination
+#     of Brown & Batygin 2016/2021, widened to include the lower-inclination
+#     solutions explored in MMR-based studies (Malhotra et al. 2016;
+#     Millholland & Laughlin 2017 use i9 in [11,21] deg) without assuming the
+#     literature has converged on a single value.
+#
+# These bounds are a deliberate, documented modelling choice for THIS
+# screening tool, not a claim that the true Planet Nine (if it exists) must
+# lie inside them. Report this explicitly in the article.
+
+bounds:
+  mass_earth: [5.0, 20.0]
+  a_au: [380.0, 980.0]
+  e: [0.1, 0.8]
+  i_deg: [0.0, 40.0]
+
+# Sampling method: "qmc_halton" (deterministic quasi-Monte Carlo, low-discrepancy
+# coverage of the 4D box, base primes [2,3,5,7]) or "uniform_random" (numpy
+# Generator with the given seed). QMC is the default because it gives more
+# even coverage than pseudo-random sampling for the same N, which matters when
+# N is forced to be small by compute cost (see max_stage2_samples below).
+method: qmc_halton
+seed: 20260727
+n_points: 20000
+
+# Stage-2/3 of the filter funnel (N-body stability, then apsidal alignment) are
+# the expensive steps: each surviving point needs an actual REBOUND
+# integration against the real ETNO catalog. Running that on all n_points
+# would be computationally prohibitive on modest hardware (see
+# scripts/benchmark_integration_cost.py). We therefore cap how many stage-1
+# survivors actually get integrated; if more than this many pass stage 1, the
+# excess are marked "not_evaluated_capacity_limit" rather than silently
+# skipped, so the funnel percentages stay honest about what was and wasn't
+# actually tested.
+max_stage2_samples: 200
+max_stage3_samples: 60
+
+# Stage-2 uses a SHORT budget (gross instability / ejection screening only,
+# not secular alignment) so it is affordable per point; stage-3 (apsidal
+# alignment) reuses configs/budgets/secular.yaml on the (much smaller) stage-3
+# survivor set.
+stage2_budget: configs/budgets/montecarlo_stage2.yaml

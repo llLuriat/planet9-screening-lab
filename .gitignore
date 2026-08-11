@@ -1,0 +1,13 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Run outputs: individual runs and the latest-run pointer are generated
+# artifacts, not source. runs/README.md stays tracked.
+runs/*/
+runs/latest_run.txt

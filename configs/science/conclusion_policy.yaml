@@ -1,0 +1,18 @@
+allowed_claims:
+  - exploratory_screening_only
+  - candidate_of_interest_within_protocol
+  - no_candidate_found
+  - inconclusive
+prohibited_claims:
+  - confirmed_planet9
+  - planet9_found
+  - real_orbit_confirmed
+  - validated_planet9
+  - discovered_planet9
+  - proved_planet9
+allowed_evidence_levels:
+  - none
+  - weak
+  - exploratory
+  - moderate_requires_validation
+v1_disallow_strong: true

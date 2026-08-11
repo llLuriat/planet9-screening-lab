@@ -1,0 +1,6 @@
+candidate_id,mass_earth,a_au,e,i_deg,omega_deg,Omega_deg,mean_anomaly_deg
+p9_mid_mass_aligned,5.0,500,0.25,20,150,80,0
+p9_high_mass_family,7.0,620,0.32,25,145,85,30
+p9_low_mass_weak,2.0,450,0.18,15,130,70,60
+p9_bad_geometry,6.0,500,0.2,10,20,30,120
+p9_inner_unstable,8.0,260,0.45,30,150,80,180

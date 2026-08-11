@@ -1,0 +1,20 @@
+# Stage-2 Monte Carlo budget: cheap gross-stability / ejection screen only.
+#
+# This is NOT meant to detect secular apsidal alignment (that needs the Gyr
+# timescale in configs/budgets/secular.yaml and only runs on the much smaller
+# stage-3 survivor set). Stage 2's only job is to reject points that are
+# grossly, quickly unstable (ejections, immediate close encounters, NaN
+# states) so we don't waste Gyr-scale integration time on candidates that
+# would never have survived anyway.
+#
+# integration_years: 100 Myr's dynamical instabilities on this timescale are
+# rare for well-separated orbits but real, fast instabilities (crossing
+# orbits, strong resonant kicks) typically show up within 1e5-1e6 yr - using
+# 1e6 yr here is a documented, cheap-but-meaningful screen, not a substitute
+# for the full secular integration.
+integration_years: 1000000
+timestep_years: 0.593644  # same physical justification as secular.yaml (P_Jupiter/20)
+seeds: [12345]
+integrator: whfast
+max_candidates: 1  # each stage-2 sample is run individually via the engine directly
+checkpoint_interval_years: null

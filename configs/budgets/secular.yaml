@@ -1,0 +1,43 @@
+# Secular-timescale budget (V2, item 1 of the V1->V2 plan).
+#
+# integration_years
+# ------------------
+# The article claims need 1e8-4e9 yr to validate long-term apsidal alignment.
+# We deliberately do NOT start at 4e9 here: this repository has not yet been
+# benchmarked on the machine that will actually run it (see
+# scripts/benchmark_integration_cost.py and results/hardware_benchmark.json,
+# generated after running that script). 1e8 yr (100 Myr) is the conservative
+# starting point of the range the plan allows. Once hardware_benchmark.json
+# exists, re-evaluate this value honestly: if 4e9 yr is not reachable in a
+# reasonable wall-clock budget on the available machine, keep the largest
+# value that is honest and say so explicitly in the article and in
+# docs/LIMITACOES.md - do not force a round number that was never actually run.
+integration_years: 100000000  # 1e8 yr = 100 Myr; raise only after benchmarking
+
+# timestep_years
+# --------------
+# Derived, not guessed: dt = P_Jupiter / 20, where P_Jupiter is computed from
+# Jupiter's semi-major axis in data/solar_system/giants_epoch.csv
+# (a = 5.2044 AU -> P = sqrt(a^3) = 11.8729 yr in these units, since
+# sim.G = 4*pi^2 with mass in Msun, distance in AU, time in yr).
+# 11.8729 / 20 = 0.593644 yr. Jupiter is the fastest body in the integrated
+# system (giants + P9 candidate + ETNOs); the P9 candidate and ETNOs orbit far
+# more slowly and do not set the timestep requirement. See
+# planet9lab.physics.recommended_timestep_years(), which computes this same
+# value programmatically from the giants catalog so this file and the code
+# cannot silently drift apart - a test asserts they match.
+timestep_years: 0.593644
+
+# checkpoint_interval_years
+# --------------------------
+# At 1e8 yr / 0.593644 yr per step ~= 1.68e8 timesteps per branch. On old
+# hardware (see the E3-1230 v2 note in scripts/benchmark_integration_cost.py)
+# this can run for hours to days. Checkpointing every 1e6 yr (~100 checkpoints
+# over the full run) bounds the amount of work lost to a crash/interruption to
+# at most ~1e6/1e8 = 1% of the run, while keeping checkpoint I/O overhead small
+# relative to integration cost.
+checkpoint_interval_years: 1000000
+
+seeds: [12345]
+integrator: whfast
+max_candidates: 7

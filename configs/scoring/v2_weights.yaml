@@ -1,0 +1,11 @@
+apsidal_clustering: 0.20
+anti_alignment: 0.25
+survival_rate: 0.20
+stability: 0.20
+numerical_health: 0.15
+min_delta_of_interest: 0.08
+weak_delta_floor: 0.02
+bad_delta_threshold: 0.05
+min_survival_rate: 0.80
+notes: "V2 diagnostic weights; not tuned to force a candidate through null models."
+

@@ -1,0 +1,6 @@
+name,a_au,e,i_deg,omega_deg,Omega_deg,mean_anomaly_deg,epoch,frame,source,validation_status,selection_included,selection_reason,selection_notes
+Sedna,506,0.855,11.9,311.3,144.5,358.0,J2000,heliocentric_ecliptic,example_fixture_from_initial_v1,partial,True,a_au_gt_150_and_q_gt_30,Example ETNO migrated from fixture; values are simplified and require validation.
+2012_VP113,266,0.69,24.0,293.8,90.8,12.0,J2000,heliocentric_ecliptic,example_fixture_from_initial_v1,partial,True,a_au_gt_150_and_q_gt_30,Included by explicit V1 fixture criterion.
+2015_TG387,1170,0.94,11.7,118.2,300.9,4.0,J2000,heliocentric_ecliptic,example_fixture_from_initial_v1,partial,True,a_au_gt_150_and_q_gt_30,High-a ETNO fixture.
+2014_SR349,290,0.84,18.0,341.0,34.8,30.0,J2000,heliocentric_ecliptic,example_fixture_from_initial_v1,partial,True,a_au_gt_150_and_q_gt_30,Included to avoid hand-picking only favorable examples.
+Pluto,39.5,0.249,17.1,113.8,110.3,14.0,J2000,heliocentric_ecliptic,example_fixture_from_initial_v1,partial,False,a_au_below_etno_threshold,Excluded control example demonstrating transparent selection.

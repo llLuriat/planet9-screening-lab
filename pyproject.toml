@@ -1,0 +1,30 @@
+[project]
+name = "planet9-screening-lab"
+version = "0.1.0"
+description = "Headless scientific screening pipeline for Planet 9 candidate regions."
+requires-python = ">=3.11"
+dependencies = [
+  "numpy",
+  "pandas",
+  "pydantic",
+  "pyyaml",
+  "typer",
+  "rich",
+  "matplotlib",
+  "pytest",
+  "ruff",
+  "rebound",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.setuptools.packages.find]
+include = ["planet9lab*"]
+exclude = ["data*", "runs*", "configs*", "scripts*", "tests*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
