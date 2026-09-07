@@ -189,6 +189,21 @@ Executor deve:
 
 *(Preencher resultado abaixo desta linha quando investigado:)*
 
+**Resultado (2026-09-07, Executor): B1 RESOLVIDO — confirmado nesta sessão.**
+1. `Test-Path planet9lab\geometry\poly_footprint.py` → True;
+   `Test-Path planet9lab\geometry\__init__.py` → True.
+2. Import smoke no venv: `python -c "from
+   planet9lab.geometry.poly_footprint import create_poly,
+   point_in_polygon; ..."` → saída "import OK".
+3. `H:\_tmp_ossos_survey\fortran\F95\getsur.f95` → True (fonte Fortran
+   do OSSOS presente; pasta read-only, nada editado ali). Fidelidade do
+   porte verificada contra o Fortran nesta sessão: `point_in_polygon`
+   usa o mesmo método do quadrante (walk_sum acumula ±4) e a mesma
+   convenção de retorno -100 para ponto na borda do polígono.
+4. A Tarefa B pode apoiar-se em `planet9lab/geometry/poly_footprint.py`
+   como base (footprint geométrico real disponível).
+
+
 ---
 
 ## Log de execução (só o Executor edita esta seção — sempre APPEND, nunca reescrever entradas antigas)
@@ -200,3 +215,57 @@ Executor deve:
 - Commit: <hash> ou "pendente"
 - Próximo passo
 -->
+
+### 2026-09-07 17:02Z Cline (Executor) — Fechamento Tarefa A + B1 + investigação viés (report-only)
+- Status: concluído
+- O que foi feito / resultado real:
+  - **Tarefa A** — confirmado que a parte de código já estava integrada
+    (commits f922e26/0ef8360; nenhum código novo nesta sessão): blocker
+    `no_observational_bias_model` definido em `planet9lab/policy.py:12`,
+    acionado quando `bias_config.get("bias_model") == "none"`
+    (`policy.py:72`; `blocker_if_none: true` no
+    `configs/science/observational_bias.yaml`); remoção automática em
+    `planet9lab/selection_bias.py:289`
+    (`remove_blocker(run_dir, "no_observational_bias_model")`) + evento
+    `no_observational_bias_model_blocker_removed` (`selection_bias.py:290`),
+    disparados quando `real_exceeds_synthetic_R` é true (contrato no
+    docstring, linhas 250-254). Testes da Tarefa A:
+    `tests/test_selection_bias.py` (2 testes novos passando).
+  - **Teste manual (passo 6)** — `runs\screen_20260903T211311606520Z`:
+    `audit/blockers.json` (e o snapshot raiz da run) contém apenas
+    `etno_catalog_not_fully_validated` — sem
+    `no_observational_bias_model`; `diagnostics/selection_bias.json`
+    registra `real_exceeds_synthetic_R: true` (R_real=0,299836 vs R
+    sintético sobrevivente=0,00593; fração sobrevivente 0,3484;
+    n_sintético=5000 gerados / 1742 sobreviventes). O estado "antes" não
+    foi fotografado, mas `events.log` da run registra o evento
+    `no_observational_bias_model_blocker_removed` (2026-09-04T16:51Z),
+    que o código só emite quando `remove_blocker` remove de fato um
+    blocker presente (`selection_bias.py:289-290`).
+  - **Gate (antes e depois, literal):** `python -m pytest -q` →
+    `151 passed in 75.90s` (baseline herdado 149 + 2 da Tarefa A);
+    `python -m ruff check .` → `All checks passed!` (exit 0).
+  - **B1 RESOLVIDO** — resultado completo na seção Bloqueios: arquivos
+    existem, import OK, fonte Fortran `getsur.f95` confirmada.
+  - **Investigação para o módulo de viés observacional (report-only,
+    nenhum código escrito):** `observational_bias.yaml` tem 4 chaves
+    (`bias_model: none`, `bias_model_level: 0`, `blocker_if_none: true`,
+    `max_evidence_level_without_bias_model: weak`); `cli.py` registra 23
+    subcomandos (template do novo comando: `sub.add_parser(...)` +
+    `add_argument(...)`, ex. `selection-bias-check` cli.py:129-131);
+    null-models em `robustness.py`: `null_models(run_dir, top=5, ...)`
+    (:334), `build_null_etnos(etnos, rng, varpis, model_name)` (:310,
+    modelos `shuffle_varpi`, `randomize_angles`,
+    `no_p9_catalog_baseline`), `_null_worker` (:138),
+    `build_null_row(...)` (:450); diagnóstico em `diagnostics.py`
+    (`diagnose_null_models` :126, `build_null_diagnosis` :147,
+    `null_markdown` :197). Relatório consolidado entregue ao usuário.
+  - **Limpeza:** 12 arquivos `pytest_*.txt` untracked na raiz
+    (redirecionamentos de sessões anteriores) removidos; nenhum código
+    alterado nesta sessão.
+- Commit: pendente (hash reportado ao usuário no fechamento da sessão;
+  este commit inclui a própria entrada)
+- Próximo passo: Auditor decide entre (a) módulo de viés observacional
+  (insumos já mapeados, template CLI pronto) e (b) Tarefa B; Tarefa C
+  segue aguardando autorização explícita + benchmark na máquina que for
+  rodar.
