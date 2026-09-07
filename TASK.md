@@ -315,3 +315,47 @@ Executor deve:
   footprint de survey), (b) executar `selection-bias-check` em runs reais
   com a nova config, ou (c) avançar para Tarefa B.
 
+### 2026-09-07 22:00Z Cline (Executor) — Modelo de eficiência de detecção OSSOS (Bannister+ 2018)
+- Status: concluído
+- O que foi feito / resultado real:
+  - **Curva logística-quadrática de eficiência** — Implementada
+    `_efficiency_square(m, eff_max, c, m0, sig)` com forma funcional
+    `η(m) = (eff_max − c·(m−21)²) / (1 + exp((m−m0)/σ))` de Bannister et al.
+    2018, ApJS 236:18 (arXiv:1805.11740), §5.2, Tabela 2 (survey "2013 AE"):
+    `eff_max=0.86`, `c=0.013`, `m0=24.0` (mag limite 50% eficiência),
+    `σ=0.35` (largura da queda).
+  - **Magnitude aparente real por objeto** — `_apparent_magnitude(H, r, Δ)`
+    calcula `V = H + 5·log10(r·Δ)` (definição padrão).
+  - **r/Δ sintéticos na população** — `generate_synthetic_population()` agora
+    aceita `q_catalog` (lista de q do catálogo) e gera:
+    - `q_au`: sorteado do catálogo com reposição (q-prior);
+    - `r_au`: aproximação do afélio `a·(1+e)`;
+    - `delta_au`: `r_au − 1.0` (geocêntrica simplificada).
+    TODO documentado: r/Δ são aproximações conservadoras, não integração
+    orbital completa.
+  - **Pipeline de seleção integrado** — `apply_selection_function()` agora
+    ramifica: (a) se r/Δ e `ossos_efficiency_params` disponíveis →
+    eficiência OSSOS; (b) senão se `h_value` disponível → stand-in linear
+    `_depth_prob_from_h()`; (c) senão → probabilidade fixa original.
+    Backward-compatível: populações sem distância/H continuam funcionando.
+  - **Config `observational_bias.yaml`** — nova seção `ossos_efficiency`
+    com os 4 parâmetros publicados; `bias_model` permanece
+    `h_prior_from_catalog` (o OSSOS é um filtro adicional, não substituto).
+  - **Atribuição** — `data/etnos/ossos_efficiency_attribution.md` criado
+    citando Bannister+ 2018 (ApJS 236:18, arXiv:1805.11740) e Bannister+
+    2016a (OSSOS survey simulator) com valores exatos da Tabela 2.
+  - **Testes** — `tests/test_selection_bias.py` ganha 5 novos testes
+    (total 167): eficiência OSSOS (objeto brilhante sobrevive, objeto
+    fraco não), `_apparent_magnitude` (Sanity check), geração de r/Δ
+    (shape e coerência com q), determinismo, e integração com q-prior.
+  - **LIMITACOES.md** — seção expandida: modelo completo documentado,
+    simplificações sinalizadas (OSSOS footprint real ainda não filtra
+    por posição angular, r/Δ via cinemática 2D), TODO de footprint real.
+  - Gate: **167 passed in 89.83s**, ruff limpo. Árvore limpa.
+- Commit: `7d5afb2` (push para origin/main)
+- Próximo passo: Auditor decide — (a) integrar footprint real do OSSOS
+  (blocos em `data/ossos_2013a_blocks.py`) como filtro posicional,
+  (b) executar `selection-bias-check` em runs reais com a nova config, ou
+  (c) avançar para Tarefa B.
+
+
