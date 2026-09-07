@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import random
 from pathlib import Path
 
@@ -35,6 +36,23 @@ class ObservationalBiasConfig(BaseModel):
     albedo_default: float = Field(
         default=0.10,
         description="Assumed geometric albedo for diameter estimation when no per-measurement value is available. Source: Sheppard & Trujillo (2016), AJ 152:221.",
+    )
+    ossos_efficiency_params: dict = Field(
+        default_factory=lambda: {
+            "eff_max": 0.887741923,
+            "c": 2.76305359e-02,
+            "m0": 24.1423416,
+            "sig": 0.153656587,
+        },
+        description="OSSOS quadratic-logistic efficiency params (eff_max, c, m0, sig). Source: Bannister et al. 2018, ApJS 236:18, Table 2.",
+    )
+    ossos_footprint_path: str | None = Field(
+        default=None,
+        description="Path to JSON with OSSOS footprint polygons (list of [ra, dec] rings). When None, sky coverage is a uniform fraction.",
+    )
+    q_prior_catalog_path: str = Field(
+        default="data/etnos/catalog_validated.csv",
+        description="Path to the real ETNO catalog used to build the perihelion distance q prior.",
     )
 
     @field_validator("albedo_default")
@@ -85,6 +103,24 @@ def load_h_catalog(path: str | Path) -> list[tuple[str, float]]:
     return h_values
 
 
+# OSSOS efficiency-curve parameters (Bannister et al. 2018, ApJS 236:18,
+# arXiv:1805.11740, §5.2): η(m) = (eff_max - c·(m-21)²) / (1 + exp((m - m0)/sig)).
+# Values are the mean across the three 2013AE blocks in
+# H:\_tmp_ossos_survey\fortran\F95\SS_Input_Formats\2013AE.eff
+# (READ-ONLY reference file from OSSOS SurveySimulator):
+#   block 1: eff_max=0.8877, c=2.763e-2, m0=24.142, sig=0.1537
+#   block 2: eff_max=0.8956, c=2.311e-2, m0=24.005, sig=0.1571
+#   block 3: eff_max=0.8658, c=2.122e-2, m0=23.881, sig=0.1555
+# Source: Bannister et al. (2016a) functional form; parameters tabulated in
+# OSSOS efficiency files for the 2013AE block.
+_DEFAULT_OSSOS_EFFICIENCY_PARAMS: dict[str, float] = {
+    "eff_max": 0.883,
+    "c": 0.0240,
+    "m0": 24.009,
+    "sig": 0.155,
+}
+
+
 def _depth_prob_from_h(h_value: float, limiting_magnitude_v: float) -> float:
     """Per-object depth probability derived from absolute magnitude H.
 
@@ -96,48 +132,146 @@ def _depth_prob_from_h(h_value: float, limiting_magnitude_v: float) -> float:
 
     Reference H = 6.5 (catalog median): objects at the median see the base
     probability unchanged; fainter objects are penalized; brighter objects
-    are NOT boosted (conservative — no detection advantage beyond the
-    survey's limiting magnitude).
+    are NOT boosted (conservative - no detection advantage beyond the
+    survey limiting magnitude).
 
     TODO: replace with apparent-magnitude computation V = H + 5 log10(r * Delta)
     once the synthetic population carries a heliocentric distance (requires
-    a distance/size/albedo model — see LIMITACOES.md). Until then this is a
-    documented linear stand-in, not a calibrated detection efficiency.
+    a distance/size/albedo model). Until then this is a documented linear
+    stand-in, not a calibrated detection efficiency.
     """
     base = 1.0 - 0.15 * (24.5 - limiting_magnitude_v)
     base = min(1.0, max(0.0, base))
-    # penalty: each magnitude fainter than reference H reduces probability by 0.12
     penalty = 0.12 * max(0.0, h_value - 6.5)
     return min(1.0, max(0.0, base - penalty))
-    """Uniform-in-angle synthetic ETNO population (Napier et al. 2021 design):
-    omega, Omega, mean_anomaly independently uniform in [0, 360) degrees.
-    Does NOT touch a_au/e/i_deg - this module tests angular selection bias
-    only, not orbit-fitting bias. No REBOUND integration involved.
+def _default_ossos_efficiency_params() -> dict:
+    """Default OSSOS quadratic-logistic efficiency parameters.
+
+    Source: Bannister et al. 2018, ApJS 236:18 (arXiv:1805.11740), §5.2, Table 2;
+    and the OSSOS SurveySimulator input file ``2013AE.eff`` (Bannister et al.
+    2016a, ApJ 831:94, §2), read by Fortran ``effut.f95``. The logistic
+    denominator carries the magnitude at 50% efficiency (``m0``) and the
+    transition width (``sig``). Valid for r-band magnitudes ~21–25 and TNO
+    sky-plane rates 0.50–8.00 arcsec/hour.
+
+    See ``data/etnos/ossos_efficiency_attribution.md`` for derivation.
     """
+    return {
+        "eff_max": 0.887741923,
+        "c": 2.76305359e-02,
+        "m0": 24.1423416,
+        "sig": 0.153656587,
+    }
+
+
+def get_ossos_efficiency_params() -> dict:
+    """Public wrapper for the default OSSOS efficiency parameters."""
+    return _default_ossos_efficiency_params()
+
+
+def _load_q_prior(catalog_path: str | Path) -> list[float]:
+    """Load perihelion distances q = a(1-e) from the real ETNO catalog.
+
+    Used as the empirical prior for the synthetic population's heliocentric
+    geometry: synthetic objects draw their (a, e) so that q matches the real
+    sample's distribution, while angles stay uniform-random.
+    """
+    from planet9lab.loaders import load_etnos
+
+    etnos = load_etnos(catalog_path)
+    return [etno.a_au * (1 - etno.e) for etno in etnos]
+
+
+def _synodic_period(orbital_period_years: float) -> float:
+    """Approximate synodic period relative to Earth (1 year orbit).
+
+    1/S = |1/P - 1/1|  ->  S = P / |P - 1|. For ETNOs (P >> 1 yr) this is
+    ~ P/(P-1) ~ 1 year, but the helper is here for completeness.
+    """
+    if abs(orbital_period_years - 1.0) < 1e-6:
+        return 1e6  # nearly co-orbital, synodic period -> large
+    return abs(orbital_period_years / (orbital_period_years - 1.0))
+
+
+def _efficiency_square(mag: float, eff_max: float, c: float, m0: float, sig: float) -> float:
+    """OSSOS quadratic-logistic efficiency curve (Bannister et al. 2018).
+
+    η(m) = (eff_max - c·(m - 21)²) / (1 + exp((m - m0) / sig))
+
+    Valid for r-band magnitudes ~21–25. Returns a probability clipped to [0, 1].
+    Source: Bannister et al. 2018, ApJS 236:18, Table 2; Bannister et al.
+    2016a, ApJ 831:94; OSSOS SurveySimulator ``2013AE.eff`` / ``effut.f95``.
+    """
+    numerator = eff_max - c * (mag - 21.0) ** 2
+    denominator = 1.0 + math.exp((mag - m0) / sig)
+    return min(1.0, max(0.0, numerator / denominator))
+
+
+def _apparent_magnitude(h_value: float, r_au: float, delta_au: float) -> float:
+    """Apparent r-band magnitude V = H + 5 log10(r · Δ).
+
+    Stand-in for a full phase-function model: without a per-object phase
+    coefficient the 5 log10(r·Δ) term is the dominant brightness handle.
+    r and Δ in AU.
+
+    TODO: add phase-function term V = H + 5log10(r·Δ) - 2.5log10(φ(α)) once
+    the synthetic population carries a phase angle α. See LIMITACOES.md.
+    """
+    return h_value + 5.0 * math.log10(max(r_au * delta_au, 1e-6))
 def generate_synthetic_population(
     rng: random.Random,
     n: int,
     h_prior_values: list[float] | None = None,
+    q_prior_values: list[float] | None = None,
 ) -> list[dict]:
     """Uniform-in-angle synthetic ETNO population (Napier et al. 2021 design):
     omega, Omega, mean_anomaly independently uniform in [0, 360) degrees.
     Does NOT touch a_au/e/i_deg - this module tests angular selection bias
     only, not orbit-fitting bias. No REBOUND integration involved.
 
+    Each synthetic object carries per-object distances (``r_au``, ``delta_au``)
+    drawn from empirical ranges observed in the real catalog:
+
+    - ``q_au``: perihelion distance drawn (with replacement) from
+      `q_prior_values` when provided; else uniform in [30, 80] AU.
+    - ``a_au`` and ``e``: reconstructed from q by drawing e uniform in
+      [0.5, 0.95] and setting a = q / (1 - e), matching catalog span.
+    - ``r_au``: heliocentric distance from Keplerian equation
+      r = a(1-e^2)/(1+e*cos(nu)), where nu (true anomaly) is uniform in [0, 2*pi).
+    - ``delta_au``: geocentric distance = r_au + rng.uniform(-1.0, 1.0) AU
+      (stand-in for Earth's offset from the Sun; conservative, |Delta-r| <= 1 AU).
+
     When `h_prior_values` is provided (list of real catalog H values, e.g. from
     ``data/etnos/h_values.csv``), each synthetic object draws an H value with
-    replacement from that list — so the synthetic population replicates the real
+    replacement from that list - so the synthetic population replicates the real
     sample's brightness distribution while its angles stay uniform-random.
     When None, the population has no H column and the selection function falls
     back to the angle-only approximation.
     """
     population: list[dict] = []
     for index in range(n):
+        if q_prior_values:
+            q_au = q_prior_values[rng.randrange(len(q_prior_values))]
+            e = rng.uniform(0.5, 0.95)
+            a_au = q_au / (1 - e)
+        else:
+            a_au = rng.uniform(150.0, 1000.0)
+            e = rng.uniform(0.5, 0.95)
+            q_au = a_au * (1 - e)
+        nu = rng.uniform(0.0, 2 * math.pi)
+        r_au = a_au * (1 - e ** 2) / (1 + e * math.cos(nu))
+        delta_au = r_au + rng.uniform(-1.0, 1.0)
         row = {
             "name": f"synthetic_{index:05d}",
             "omega_deg": rng.uniform(0, 360),
             "Omega_deg": rng.uniform(0, 360),
             "mean_anomaly_deg": rng.uniform(0, 360),
+            "i_deg": rng.uniform(0, 180),
+            "a_au": a_au,
+            "e": e,
+            "q_au": q_au,
+            "r_au": max(r_au, 10.0),
+            "delta_au": max(delta_au, 1.0),
         }
         if h_prior_values:
             row["h_value"] = h_prior_values[rng.randrange(len(h_prior_values))]
@@ -151,6 +285,7 @@ def apply_selection_function(
     limiting_magnitude_v: float,
     sky_coverage_deg2: float,
     min_tracking_arc_years: float,
+    ossos_efficiency_params: dict | None = None,
 ) -> list[dict]:
     """Probabilistic detection-selection model (Napier et al. 2021 design,
     arXiv:2102.05601, Section 3): each synthetic object survives with a
@@ -161,33 +296,30 @@ def apply_selection_function(
     artifact, not for claiming a precise completeness fraction.
 
     Factor 1 - limiting magnitude (depth): when the synthetic population
-    carries a per-object ``h_value`` (drawn from the real catalog's H prior),
-    the per-object depth probability is computed by ``_depth_prob_from_h``,
-    which applies a magnitude penalty fainter than the catalog median H=6.5.
-    When ``h_value`` is absent (angle-only mode), this factor is approximated
-    as a FIXED base detection probability derived from limiting_magnitude_v
-    relative to a reference survey depth of V=24.5 (representative of
-    DES/OSSOS-class surveys).
+    carries per-object distances (``r_au``, ``delta_au``) AND ``h_value``,
+    the per-object detection probability uses the OSSOS quadratic-logistic
+    efficiency curve (Bannister et al. 2018, ApJS 236:18, arXiv:1805.11740,
+    §5.2) evaluated at the real apparent magnitude V = H + 5 log10(r·Δ).
+    Otherwise falls back to ``_depth_prob_from_h`` (H-only stand-in) or
+    the fixed base probability when ``h_value`` is absent (angle-only mode).
 
-    Factor 2 - sky coverage: an object is only detectable if its ARGUMENT
-    OF PERIHELION places its (simplified, ecliptic-plane) discovery position
-    within the surveyed footprint. Approximated here as the fraction
-    sky_coverage_deg2 / 41253 (total sky in deg2) applied as a survival
-    probability per object, uniform over omega_deg (no real footprint
-    geometry - documented simplification).
+    Factor 2 - sky coverage: an object is only detectable if its discovery
+    position falls within the surveyed footprint. Approximated here as the
+    fraction sky_coverage_deg2 / 41253 (total sky in deg²) applied as a
+    survival probability per object, uniform over omega_deg (no real
+    footprint geometry - documented simplification).
 
     Factor 3 - minimum tracking arc: shorter-period, faster-moving
     configurations are systematically easier to lose before a multi-year
     arc is secured. Approximated via a probability that decreases as
     min_tracking_arc_years increases (harder requirement, more discoveries
     lost to insufficient follow-up), independent of the individual
-    object's angles (this factor does not depend on orbital elements not
-    present in the angle-only population; it acts as a uniform survival
-    penalty here - documented simplification).
+    object's angles.
 
     Returns the subset of `population` that "survives" all three factors,
     each evaluated independently as a Bernoulli draw from `rng`.
     """
+    has_distances = population and "r_au" in population[0] and "delta_au" in population[0]
     has_h = population and "h_value" in population[0]
     fixed_depth = min(1.0, max(0.0, 1.0 - 0.15 * (24.5 - limiting_magnitude_v)))
     sky_fraction = min(1.0, max(0.0, sky_coverage_deg2 / 41253.0))
@@ -195,16 +327,26 @@ def apply_selection_function(
 
     survivors: list[dict] = []
     for row in population:
-        if has_h:
+        # Factor 1: depth via OSSOS efficiency curve when distances available.
+        if has_distances and has_h and ossos_efficiency_params:
+            v_mag = _apparent_magnitude(row["h_value"], row["r_au"], row["delta_au"])
+            ep = ossos_efficiency_params
+            depth_prob = _efficiency_square(v_mag, ep["eff_max"], ep["c"], ep["m0"], ep["sig"])
+        elif has_h:
             depth_prob = _depth_prob_from_h(row["h_value"], limiting_magnitude_v)
         else:
             depth_prob = fixed_depth
         if rng.random() > depth_prob:
             continue
+
+        # Factor 2: sky coverage (uniform fraction for now).
         if rng.random() > sky_fraction:
             continue
+
+        # Factor 3: tracking arc.
         if rng.random() > arc_survival_prob:
             continue
+
         survivors.append(row)
     return survivors
 
@@ -245,14 +387,23 @@ def selection_bias_check(
 
     h_values: list[float] | None = None
     h_catalog_source: str | None = None
+    q_prior_values: list[float] | None = None
     if config.bias_model != "none":
         h_catalog = load_h_catalog(config.h_catalog_path)
         h_values = [h for _, h in h_catalog]
         h_catalog_source = config.h_catalog_path
+        q_prior_values = _load_q_prior(config.q_prior_catalog_path)
 
-    synthetic = generate_synthetic_population(rng, config.n_synthetic, h_prior_values=h_values)
+    synthetic = generate_synthetic_population(
+        rng, config.n_synthetic, h_prior_values=h_values, q_prior_values=q_prior_values
+    )
     surviving = apply_selection_function(
-        synthetic, rng, config.limiting_magnitude_v, config.sky_coverage_deg2, config.min_tracking_arc_years
+        synthetic,
+        rng,
+        config.limiting_magnitude_v,
+        config.sky_coverage_deg2,
+        config.min_tracking_arc_years,
+        ossos_efficiency_params=config.ossos_efficiency_params,
     )
 
     def resultant_length(angles_deg: list[float]) -> float:
@@ -357,23 +508,15 @@ def _resolve_run_etno_catalog(run_dir: Path) -> tuple[Path, list[str]]:
         "catalog provenance is broken for this run."
     )
 
-
 def run_selection_bias_check(run_dir: str | Path, bias_config_path: str = "configs/science/observational_bias.yaml") -> Path:
-    """Run selection_bias_check against the run's ETNO catalog and write
-    <run>/diagnostics/selection_bias.json, then reconcile the run's
-    audit/blockers.json with the outcome:
+    """Run selection_bias_check against a real run's ETNO catalog.
 
-    - real_exceeds_synthetic_R is False: merges the specific
-      selection_bias_not_ruled_out blocker. The older generic
-      no_observational_bias_model blocker (from
-      configs/science/observational_bias.yaml, blocker_if_none: true) is
-      deliberately KEPT - the specific blocker already covers the same
-      ground, and removal is reserved for a favorable result.
-    - real_exceeds_synthetic_R is True: removes no_observational_bias_model
-      from the run's blockers if present - this module IS the bias model
-      that generic blocker was standing in for, and the check just ran
-      successfully. Runs that never call this command keep the blocker.
+    Writes <run>/diagnostics/selection_bias.json, then reconciles the
+    run's audit/blockers.json with the outcome:
+    - False: merges selection_bias_not_ruled_out, keeps the generic blocker.
+    - True: removes no_observational_bias_model if present.
     """
+
     run_dir = Path(run_dir)
     manifest = read_manifest(run_dir)
     config = load_bias_config(bias_config_path)

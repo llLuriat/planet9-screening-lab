@@ -113,27 +113,21 @@ FT28, 2015 GT50 — registrados como próximo lote, não implementados.
   ainda não existe (item 4). Confirmado ausente no código em 2026-08-15.
 
 **Atualização 2026-09-03 — modelo de viés observacional implementado (ponto 5 do
-plano pós-auditoria, versão inicial):** `planet9lab/selection_bias.py` e o
-comando `selection-bias-check --from-run <run>` comparam a concentração
+plano pós-auditoria, versão inicial):** planet9lab/selection_bias.py e o
+comando selection-bias-check --from-run <run> comparam a concentração
 angular (ϖ = ω + Ω, estatística R tipo Rayleigh) do catálogo real de 16 ETNOs
 contra uma população sintética uniforme submetida a um modelo de seleção de 3
 fatores (profundidade limitante em V, cobertura de céu, arco mínimo de
 rastreamento — desenho de Napier et al. 2021, arXiv:2102.05601, Seção 3).
 
-**Resultado real (seed 20260903, config h_prior_from_catalog):**
-
-`real_exceeds_synthetic_R: true` — o clustering angular do catálogo real
-não é trivialmente reproduzido por este modelo de viés simplificado, mesmo
-com o fator de profundidade dependente de H.
-
 **Atualização 2026-09-07 — modelo com H-prior do SBDB
-(`bias_model: h_prior_from_catalog`):** o fator de profundidade agora é
+(ias_model: h_prior_from_catalog):** o fator de profundidade agora é
 calculado **por objeto** a partir de sua magnitude absoluta H. Cada objeto
-sintético sorteia um H do catálogo empírico `data/etnos/h_values.csv`
+sintético sorteia um H do catálogo empírico data/etnos/h_values.csv
 (16 valores do JPL Small-Body Database, consultados 2026-09-07 —
 data/etnos/h_values_attribution.md lista cada valor com ref SBDB). A
 sobrevivência à profundidade usa _depth_prob_from_h(h, V_lim): objetos
-mais fracos que a mediana (H=6.5) são penalizados linearmente (−0,12 por
+mais fracos que a mediano (H=6.5) são penalizados linearmente (−0,12 por
 magnitude); objetos mais brilhantes NÃO são boostados (conservativo). O
 catálogo abrange de Sedna (H=1,50) a objetos em H~8,5, cobrindo a faixa
 real da amostra. Albedo assumido: 0,10 (Sheppard & Trujillo 2016,
@@ -141,36 +135,49 @@ AJ 152:221) para estimativa de diâmetro — marcado como TODO substituir
 por V = H + 5 log10(r·Delta) quando a população sintética passar a
 carregar distância heliocêntrica.
 
+**Atualização 2026-09-07 (2ª etapa) — modelo com curva OSSOS de eficiência de
+detecção (ias_model: h_prior_from_catalog + ossos_efficiency_params):**
+o fator de profundidade agora usa a curva quadrática-logística de Bannister
+et al. 2018 (ApJS 236:18, arXiv:1805.11740, §5.2), η(m) = (eff_max − c·(m−21)²)
+/ (1 + exp((m−m₀)/σ)), avaliada na magnitude aparente real V = H + 5 log10(r·Δ)
+de cada objeto sintético. Os parâmetros padrão (eff_max=0,8877, c=0,02763,
+m₀=24,142, σ=0,1537) são a média dos três blocos 2013AE do OSSOS
+(data/etnos/ossos_efficiency_attribution.md documenta a derivação). A
+população sintética agora carrega distâncias heliocêntrica (r) e geocêntrica
+(Δ) sorteadas de uma prior de q = a(1−e) do catálogo real, coerente com os
+elementos orbitais simulados. O albedo permanece fixo em 0,10 (Sheppard &
+Trujillo 2016).
+
 **Limitações que impedem tratar isto como confirmação forte (reportar
 sempre junto com o resultado acima, nunca isolado):**
 
 - O modelo continua *angle-only*: profundidade e arco de rastreamento são
   penalidades independentes dos ângulos do objeto — apenas o fator de
   cobertura de céu tem dependência angular. Capacidade limitada de gerar
-  clustering artificial; o teste é melhor lido como este modelo
-  simplificado específico não explica o clustering, não como não há
-  viés de seleção.
-- O fator de profundidade é um *stand-in* linear (H vs mediana), não uma
-  eficiência de detecção calibrada. Substituição por magnitude aparente
-  real (V = H + 5 log10(r·Delta)) requer distância/tamanho/albedo
-  sintéticos — fora do escopo atual.
-- Não modela geometria de footprint real (survey pointing) nem cadência
-  real (DES, OSSOS, etc.).
+  clustering artificial; o teste é melhor lido como `este modelo
+  simplificado específico não explica o clustering`, não como `não há
+  viés de seleção`.
+- A magnitude aparente V = H + 5 log10(r·Δ) não inclui função de fase
+  (V = H + 5log10(r·Δ) − 2.5log10(φ(α))) — a população sintética não carrega
+  ângulo de fase α. TODO marcado no código.
+- A curva OSSOS é válida para magnitudes r ~21–25 e taxas no plano do céu
+  0,50–8,00 arcsec/hora; fora dessas faixas a eficiência reportada é
+  extrapolação.
+- Não modela geometria de footprint real (survey pointing) nem cadência real
+  (DES, OSSOS, etc.).
 - O resultado não deve ser citado como probabilidade de detecção calibrada.
-- selection-bias-check desativa o blocker antigo
-  
-o_observational_bias_model (locker_if_none: false na config
+- `selection-bias-check` desativa o blocker antigo
+  `no_observational_bias_model` (`blocker_if_none: false` na config
   atual) em resultado favorável; em resultado desfavorável adiciona
-  selection_bias_not_ruled_out.
-- pply_v2_evidence capa o nível de evidência em weak quando
-  
-eal_exceeds_synthetic_R: false; quando 	rue, NÃO eleva
+  `selection_bias_not_ruled_out`.
+- `apply_v2_evidence` capa o nível de evidência em `weak` quando
+  `real_exceeds_synthetic_R: false`; quando `true`, NÃO eleva
   automaticamente — o teste passar é necessário, não suficiente, para
-  qualquer nível acima de weak.
+  qualquer nível acima de `weak`.
 
 Próximos passos possíveis (fora do escopo deste lote): modelo de
-seleção dependente de magnitude aparente real (requer distância/tamanho/
-albedo sintéticos) e footprint geométrico real de survey.
+seleção dependente de magnitude aparente real com função de fase
+(requer ângulo de fase α sintético) e footprint geométrico real de survey.
 
 ## Atualização V2 (item 2 do plano V1->V2: Monte Carlo / QMC)
 

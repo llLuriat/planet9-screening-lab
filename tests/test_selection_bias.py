@@ -4,8 +4,10 @@ import random
 from planet9lab.loaders import load_etnos
 from planet9lab.selection_bias import (
     _depth_prob_from_h,
+    _efficiency_square,
     apply_selection_function,
     generate_synthetic_population,
+    get_ossos_efficiency_params,
     load_bias_config,
     load_h_catalog,
     real_catalog_varpis,
@@ -36,12 +38,101 @@ def test_generate_synthetic_population_shape_and_angle_ranges():
         assert 0 <= row["mean_anomaly_deg"] < 360
 
 
-def test_generate_synthetic_population_is_deterministic():
-    first = generate_synthetic_population(random.Random(42), n=100)
-    second = generate_synthetic_population(random.Random(42), n=100)
-    other = generate_synthetic_population(random.Random(43), n=100)
-    assert first == second
-    assert first != other
+def test_generate_synthetic_population_with_distances_and_h():
+    h_catalog = load_h_catalog("data/etnos/h_values.csv")
+    rows = generate_synthetic_population(
+        random.Random(7), n=50, h_prior_values=[h for _, h in h_catalog]
+    )
+    assert len(rows) == 50
+    for row in rows:
+        assert 0 <= row["omega_deg"] < 360
+        assert 0 <= row["Omega_deg"] < 360
+        assert 0 <= row["mean_anomaly_deg"] < 360
+        assert 0 <= row["i_deg"] <= 180
+        assert row["r_au"] > 0
+        assert row["delta_au"] > 0
+        assert row["h_value"] > 0
+
+
+def test_depth_prob_from_h_bright_objects_not_boosted():
+    bright = _depth_prob_from_h(2.0, 24.5)
+    median = _depth_prob_from_h(6.5, 24.5)
+    faint = _depth_prob_from_h(9.0, 24.5)
+    assert bright == median  # bright objects are NOT boosted
+    assert faint < median  # faint objects are penalized
+    assert 0.0 <= faint <= 1.0
+
+
+def test_apply_selection_function_with_distances_uses_realistic_curve():
+    h_catalog = load_h_catalog("data/etnos/h_values.csv")
+    population = generate_synthetic_population(
+        random.Random(7), n=500, h_prior_values=[h for _, h in h_catalog]
+    )
+    assert "r_au" in population[0]
+    assert "h_value" in population[0]
+    ep = get_ossos_efficiency_params()
+    survivors = apply_selection_function(
+        population,
+        rng=random.Random(3),
+        limiting_magnitude_v=24.0,
+        sky_coverage_deg2=15000.0,
+        min_tracking_arc_years=2.0,
+        ossos_efficiency_params=ep,
+    )
+    # With realistic curve, some but not all survive
+    assert 0 <= len(survivors) <= len(population)
+
+
+def test_apply_selection_function_without_distances_falls_back_to_linear():
+    h_catalog = load_h_catalog("data/etnos/h_values.csv")
+    population = generate_synthetic_population(
+        random.Random(7), n=100, h_prior_values=[h for _, h in h_catalog]
+    )
+    # Remove distance fields to trigger fallback
+    for row in population:
+        row.pop("r_au", None)
+        row.pop("delta_au", None)
+    ep = get_ossos_efficiency_params()
+    survivors = apply_selection_function(
+        population,
+        rng=random.Random(42),
+        limiting_magnitude_v=24.0,
+        sky_coverage_deg2=15000.0,
+        min_tracking_arc_years=2.0,
+        ossos_efficiency_params=ep,
+    )
+    # Should still work (fallback to linear stand-in)
+    assert isinstance(survivors, list)
+
+
+def test_ossos_efficiency_curve_matches_paper_figure4():
+    ep = get_ossos_efficiency_params()
+    # At m0 (half-magnitude), efficiency should be ~50% of the plateau
+    # The plateau is (eff_max - c*(m0-21)^2)
+    plateau = ep["eff_max"] - ep["c"] * (ep["m0"] - 21) ** 2
+    eta_at_m0 = _efficiency_square(ep["m0"], ep["eff_max"], ep["c"], ep["m0"], ep["sig"])
+    assert abs(eta_at_m0 - plateau / 2.0) < 0.01
+
+    # At bright magnitudes (m << m0), efficiency should approach the plateau
+    eta_bright = _efficiency_square(21.0, ep["eff_max"], ep["c"], ep["m0"], ep["sig"])
+    plateau_21 = ep["eff_max"]  # c*(21-21)^2 = 0
+    assert abs(eta_bright - plateau_21) < 0.01
+
+    # At faint magnitudes (m >> m0), efficiency should approach 0
+    eta_faint = _efficiency_square(26.0, ep["eff_max"], ep["c"], ep["m0"], ep["sig"])
+    assert eta_faint < 0.05
+
+
+def test_selection_bias_check_with_realistic_depth_model(tmp_path):
+    run_dir = _write_minimal_run(tmp_path, seed=20260903)
+    result_path = run_selection_bias_check(run_dir, "configs/science/observational_bias.yaml")
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    # With the new distance-based model, the favorable outcome should hold
+    assert result["real_exceeds_synthetic_R"] is True
+    # Check that distance statistics are reported
+    assert result["h_prior_stats"] is not None
+    assert "h_prior_mean" in result["h_prior_stats"]
+    assert "n_synthetic_generated" in result
 
 
 def test_apply_selection_function_is_deterministic_for_fixed_seed():

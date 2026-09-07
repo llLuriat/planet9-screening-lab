@@ -8,12 +8,25 @@ sky_coverage_deg2: 20000.0
 min_tracking_arc_years: 2.0
 n_synthetic: 5000
 # H-prior from JPL SBDB (data/etnos/h_values.csv); per-object depth probability
-# uses _depth_prob_from_h() which applies a magnitude penalty fainter than
-# the catalog median H=6.5. Source: NASA/JPL SBDB API, queried 2026-09-07.
+# uses the OSSOS quadratic-logistic efficiency curve evaluated at the apparent
+# magnitude V = H + 5 log10(r·Δ). Source: NASA/JPL SBDB API, queried 2026-09-07.
 h_catalog_path: data/etnos/h_values.csv
+# q-prior from the real ETNO catalog (perihelion distance q = a(1-e)); synthetic
+# objects draw q from this distribution to match the real sample's heliocentric
+# geometry. Source: data/etnos/catalog_validated.csv.
+q_prior_catalog_path: data/etnos/catalog_validated.csv
 # Assumed geometric albedo for diameter estimation. Source: Sheppard & Trujillo
 # (2016), AJ 152:221 — moderate albedo used in that paper to estimate ETNO
 # diameters from H in the absence of direct measurement.
 # Published: https://iopscience.iop.org/article/10.3847/1538-3881/152/6/221
 # Preprint: https://arxiv.org/pdf/1608.08772
 albedo_default: 0.10
+# OSSOS quadratic-logistic efficiency curve parameters (Bannister et al. 2018,
+# ApJS 236:18, arXiv:1805.11740, §5.2, Table 2; Bannister et al. 2016a, ApJ 831:94).
+# η(m) = (eff_max - c·(m-21)²) / (1 + exp((m - m0)/sig)).
+# Source: data/etnos/ossos_efficiency_attribution.md
+ossos_efficiency_params:
+  eff_max: 0.887741923
+  c: 0.0276305359
+  m0: 24.1423416
+  sig: 0.153656587
