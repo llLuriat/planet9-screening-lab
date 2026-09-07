@@ -1,0 +1,29 @@
+# Shared budget for the grid/sweep sensitivity experiments
+# (configs/experiments/angle_robustness.yaml, i_boundary_scan.yaml).
+#
+# Why 1e6 yr and NOT the full secular budget:
+#   - Grid experiments multiply the candidate count (e.g. 7 base x 4 angles
+#     = 28 variants). The secular budget (1e8 yr, ~1.7e8 timesteps per branch,
+#     hours-to-days per candidate on the reference hardware - see
+#     scripts/benchmark_integration_cost.py) is not feasible for a grid before
+#     the real hardware benchmark exists.
+#   - 1e6 yr at dt = P_Jupiter/20 is the same documented "cheap-but-meaningful"
+#     screen the funnel uses for its stage-2 stability cut
+#     (configs/budgets/montecarlo_stage2.yaml): it reliably exposes fast
+#     instabilities, close encounters and resonant kicks - exactly the dynamics
+#     that a change in omega_deg / Omega_deg / i_deg shifts. What it CANNOT do
+#     is resolve long-term apsidal alignment; that stays secular-budget and
+#     remains benchmark-gated.
+#   - The claim these experiments support is therefore RANKING STABILITY OF THE
+#     SCREEN across orientations - not a Gyr-scale alignment statement. State
+#     that scope explicitly in the article.
+#
+# Cost envelope: max_stage2_samples=200 individual 1e6-yr integrations is the
+# reference the funnel already deems acceptable (parameter_space.yaml). The
+# largest grid here is 28-35 variants, well inside that envelope.
+integration_years: 1000000
+timestep_years: 0.593644  # P_Jupiter/20 - same derivation as secular.yaml
+seeds: [12345]
+integrator: whfast
+checkpoint_interval_years: null
+max_candidates: 1000  # informational; execute_run takes explicit lists, not capped

@@ -1,0 +1,13 @@
+grid_id: p9_target_region_v1
+description: Conservative V1 example region for Planet 9 candidate screening.
+candidate_catalog: data/candidates_example.csv
+# Ranges alinhados ao Quadro 1 do artigo (min/max por inversão gravitacional,
+# antes dos demais filtros dinâmicos) - ver Planeta9_Analise_Dinamica_ABNT,
+# Seção 3. Substitui os valores V1 genéricos, que divergiam do artigo.
+mass_earth_range: [4.5, 8.0]
+a_au_range: [380.0, 680.0]
+e_range: [0.28, 0.56]
+i_deg_range: [12.0, 28.0]
+omega_deg_range: [0.0, 360.0]
+Omega_deg_range: [0.0, 360.0]
+

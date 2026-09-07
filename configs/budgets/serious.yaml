@@ -1,0 +1,13 @@
+candidates: 100
+seeds: [12345, 22345, 32345]
+workers: 1
+screen_integrator: whfast
+screen_t_myr: 0.05
+screen_dt_years: 0.25
+null_model_t_myr: 0.002
+output_cadence_years: 500.0
+top_to_validate: 10
+max_energy_drift_rel: 1.0e-6
+min_survival_rate: 0.85
+min_delta_score: 0.05
+min_delta_clustering_R: 0.02

@@ -1,0 +1,5 @@
+integration_years: 50
+timestep_years: 0.5
+seeds: [12345]
+integrator: whfast
+max_candidates: 5

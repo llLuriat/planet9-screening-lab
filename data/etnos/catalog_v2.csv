@@ -1,0 +1,7 @@
+name,a_au,e,i_deg,omega_deg,Omega_deg,mean_anomaly_deg,epoch,frame,source,validation_status,selection_included,selection_reason,selection_notes
+Sedna,506,0.855,11.9,311.3,144.5,358.0,J2000,heliocentric_ecliptic,initial_fixture_pending_external_verification,partial,true,a_au_gt_150_and_q_gt_30,Carried from V1 fixture; requires manual MPC/JPL/Horizons verification.
+2012_VP113,266,0.69,24.0,293.8,90.8,12.0,J2000,heliocentric_ecliptic,initial_fixture_pending_external_verification,partial,true,a_au_gt_150_and_q_gt_30,Carried from V1 fixture; requires manual MPC/JPL/Horizons verification.
+2015_TG387,1170,0.94,11.7,118.2,300.9,4.0,J2000,heliocentric_ecliptic,initial_fixture_pending_external_verification,partial,true,a_au_gt_150_and_q_gt_30,Carried from V1 fixture; requires manual MPC/JPL/Horizons verification.
+2014_SR349,290,0.84,18.0,341.0,34.8,30.0,J2000,heliocentric_ecliptic,initial_fixture_pending_external_verification,partial,true,a_au_gt_150_and_q_gt_30,Carried from V1 fixture; requires manual MPC/JPL/Horizons verification.
+Pluto,39.5,0.249,17.1,113.8,110.3,14.0,J2000,heliocentric_ecliptic,initial_fixture_pending_external_verification,partial,false,a_au_below_etno_threshold,Excluded by ETNO criterion; retained as transparent negative example.
+

@@ -1,0 +1,38 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local/editor files
+.env
+.env.*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local Codex/temp extraction artifacts
+.codex_tmp*/
+
+# Project archives and bulky generated snapshots
+*.zip
+
+# Runtime scratch/checkpoints
+*.tmp
+*.bak
+
+# Run outputs: individual runs and the latest-run pointer are generated
+# artifacts, not source. runs/README.md stays tracked.
+runs/*/
+runs/latest_run.txt

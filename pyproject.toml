@@ -1,0 +1,54 @@
+[project]
+name = "planet9-screening-lab"
+version = "0.1.0"
+description = "Headless scientific screening pipeline for Planet 9 candidate regions."
+requires-python = ">=3.11"
+dependencies = [
+  "numpy",
+  "pandas",
+  "pydantic",
+  "pyyaml",
+  "typer",
+  "rich",
+  "matplotlib",
+  "pytest",
+  "ruff",
+  "rebound",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.setuptools.packages.find]
+include = ["planet9lab*"]
+exclude = ["data*", "runs*", "configs*", "scripts*", "tests*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Explicitly pinned rule set so `ruff check .` is stable across ruff versions
+# (auditoria V3, P2-1). The bare default `select` in recent ruff releases is
+# broad and changes between versions, silently breaking the gate on another
+# machine. This list fixes exactly what the project enforces today: the
+# stable core (E4/E7/E9/F/W/I) plus the specific preview rules that were
+# active when the audit ran (TRY004, RUF059, FLY002, BLE001, PLR0124) and
+# are now fixed in the code. E5xx (line length) and E4xx docstring rules are
+# intentionally not selected - the codebase does not follow them.
+select = [
+  "E4",
+  "E7",
+  "E9",
+  "F",
+  "W",
+  "I",
+  "BLE001",
+  "FLY002",
+  "PLR0124",
+  "RUF059",
+  "TRY004",
+]
+ignore = []
+

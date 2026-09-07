@@ -1,0 +1,6 @@
+protocol_version: v1
+claim_policy_version: v1
+metrics_version: v1
+scoring_version: v1
+catalog_version: canonical_v1
+allow_metric_changes_after_run: false

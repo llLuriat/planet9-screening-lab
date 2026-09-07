@@ -1,0 +1,8 @@
+min_a_au: 150
+min_q_au: 30
+require_epoch: true
+require_frame: true
+require_source: true
+allow_unvalidated: true
+claim_cap_if_unvalidated: exploratory
+

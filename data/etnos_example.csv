@@ -1,0 +1,6 @@
+object_id,a_au,e,inc_deg,omega_deg,Omega_deg,M_deg,selection_included,selection_reason,selection_notes
+Sedna,506,0.855,11.9,311.3,144.5,358.0,True,a_au_gt_150_and_q_gt_30,Example ETNO; values simplified for V1 fixture.
+2012_VP113,266,0.69,24.0,293.8,90.8,12.0,True,a_au_gt_150_and_q_gt_30,Included by explicit catalog criterion.
+2015_TG387,1170,0.94,11.7,118.2,300.9,4.0,True,a_au_gt_150_and_q_gt_30,High-a ETNO fixture.
+2014_SR349,290,0.84,18.0,341.0,34.8,30.0,True,a_au_gt_150_and_q_gt_30,Included to avoid hand-picking only favorable examples.
+Pluto,39.5,0.249,17.1,113.8,110.3,14.0,False,a_au_below_etno_threshold,Excluded control example demonstrating transparent selection.

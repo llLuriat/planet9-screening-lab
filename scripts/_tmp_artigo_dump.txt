@@ -1,0 +1,128 @@
+[P001|-] ANÁLISE DINÂMICA DO PLANETA NOVE: INVERSÃO GRAVITACIONAL, SIMULAÇÃO N-CORPOS E RESTRIÇÃO PROGRESSIVA DO ESPAÇO DE PARÂMETROS ORBITAIS
+[P002|-] SESI Escola Bahia — Projeto Astro Aventuras / Iniciação Científica
+[P003|-] RESUMO
+[P004|-] O presente trabalho reúne, integra e analisa evidências dinâmicas para restringir progressivamente os parâmetros orbitais e físicos do hipotético Planeta Nove do Sistema Solar. A partir de dados de Objetos Transnetunianos Extremos (ETNOs), levantamentos infravermelhos (IRAS, AKARI, WISE) e séries temporais do Observatório Vera C. Rubin (LSST), aplica-se um protocolo sequencial de: (1) inversão gravitacional, (2) simulação N-corpos conceitual baseada em REBOUND, (3) análise hamiltoniana secular e (4) fusão multiespectral de dados. O resultado é um modelo físico consistente que identifica a zona de máxima plausibilidade nos intervalos: massa M9 ≈ 5–7 massas terrestres, semi-eixo maior a9 ≈ 420–620 UA, excentricidade e9 ≈ 0,32–0,50 e inclinação i9 ≈ 15°–25°. O modelo não confirma a existência do planeta, mas reduz o espaço de parâmetros original em aproximadamente 95%, definindo as regiões observacionais prioritárias para as próximas campanhas com o LSST e o Roman Space Telescope.
+[P005|-] Palavras-chave: Planeta Nove. ETNOs. Mecânica Celeste. Inversão Gravitacional. Simulação N-corpos. LSST.
+[P006|Heading1] 1 INTRODUÇÃO
+[P007|-] A hipótese do Planeta Nove — um corpo de massa subneptuniana em órbita altamente excêntrica no Sistema Solar externo — emergiu formalmente em 2016 a partir do trabalho seminal de BATYGIN e BROWN (2016), que identificaram um padrão estatisticamente anômalo nas órbitas de Objetos Transnetunianos Extremos (ETNOs). Desde então, acumularam-se evidências dinâmicas independentes, ao mesmo tempo em que críticas metodológicas — especialmente relacionadas a vieses de seleção observacional — desafiaram a robustez do sinal.
+[P008|-] O presente trabalho não tem por objetivo localizar o Planeta Nove, mas construir um modelo físico consistente que reduza progressivamente o espaço de parâmetros orbitais e físicos plausíveis, integrando dados de inversão gravitacional, simulações N-corpos, análise hamiltoniana secular e fusão multiespectral de dados. Todas as inferências são explicitamente condicionadas à hipótese de existência do planeta, que permanece não confirmada.
+[P009|Heading1] 2 ESTADO ATUAL DAS EVIDÊNCIAS
+[P010|Heading2] 2.1 Agrupamento apsidal de ETNOs
+[P011|-] O caso observacional apoia-se em três pilares independentes. O primeiro é o agrupamento apsidal de ETNOs com semi-eixo maior a > 250 UA, cujas longitudes do periastro (ϖ) apresentam distribuição não uniforme no referencial eclíptico galáctico, com agrupamento em torno de ϖ ≈ 0°. Sob a hipótese nula de distribuição aleatória, a probabilidade de observar tal concentração é estimada em p < 0,01 por BATYGIN e BROWN (2016), embora análises controladas do OSSOS (LAWLER et al., 2019; 2023) reduzam a significância estatística para aproximadamente 1,6–2,1σ.
+[P012|Heading2] 2.2 Elevação artificial de periélios
+[P013|-] O segundo pilar é a existência de objetos com periélios q > 65 UA — valores impossíveis de alcançar apenas pela influência gravitacional dos planetas gigantes conhecidos. Sedna (q ≈ 76 UA, a ≈ 506 UA) e 2012 VP113 (q ≈ 80 UA, a ≈ 262 UA) são os casos paradigmáticos. A difusão secular produzida por um planeta massivo em órbita distante constitui a explicação dinâmica mais parcimoniosa disponível para esses periélios extremos.
+[P014|Heading2] 2.3 Órbitas anômalas e controvérsia estatística
+[P015|-] O terceiro pilar é o excesso de órbitas altamente inclinadas e retrógradas no Sistema Solar externo — previstas pelo modelo de BATYGIN e MORBIDELLI como consequência de ressonâncias seculares de alta ordem com o Planeta Nove. O sednoide designado ‘Ammonite’ (CHEN et al., 2025), com órbita não alinhada ao agrupamento principal, incluído no catálogo de ETNOs deste trabalho (data/etnos/catalog_validated.csv), adicionou uma restrição nova: qualquer modelo deve acomodar dispersão parcial, o que favorece semi-eixos maiores a9 > 500 UA, onde o acoplamento secular é menos intenso.
+[P016|Heading1] 3 INVERSÃO GRAVITACIONAL E PARÂMETROS ORBITAIS
+[P017|-] O método de inversão gravitacional consiste em inferir os parâmetros de um corpo perturbador a partir das perturbações observadas em objetos cuja dinâmica é conhecida. Para o Planeta Nove, os vetores observacionais são os elementos keplerianos osculadores dos ETNOs (semieixo maior, excentricidade, inclinação, longitude do nodo ascendente, argumento do periélio e anomalia média).
+[P018|-] A inversão produz restrições na forma de hipersuperfícies de probabilidade no espaço de parâmetros [M9, a9, e9, i9, ω9, Ω9]. A Tabela 1 apresenta os intervalos plausíveis resultantes da inversão, antes da aplicação dos demais filtros dinâmicos.
+[P019|-] Tabela 1 — Intervalos iniciais por inversão gravitacional
+=== TABLE 1 ===
+ROW: Parâmetro | Mínimo | Intervalo preferido | Máximo | Restrição principal
+ROW: Massa (M⊕) | 4,5 | 5 – 7 | 8 | Alinhamento apsidal
+ROW: Semi-eixo maior (UA) | 380 | 420 – 620 | 680 | Secular hamiltoniano
+ROW: Excentricidade | 0,28 | 0,32 – 0,50 | 0,56 | Periélio mín. > 150 UA
+ROW: Inclinação (°) | 12 | 15 – 25 | 28 | Clustering polar de ETNOs
+ROW: Período orbital (anos) | ~7.400 | ~8.500 – 12.500 | ~16.000 | 3.ª lei de Kepler
+ROW: Periélio estimado (UA) | ~170 | ~210 – 340 | ~420 | Derivado: a × (1 − e)
+ROW: Raio estimado (R⊕) | ~2,0 | ~2,5 – 3,5 | ~4,0 | Relação massa-raio
+ROW: Temperatura superficial (K) | ~30 | ~35 – 50 | ~65 | Lei de Stefan-Boltzmann
+=== END TABLE 1 ===
+[P020|-] Fonte: elaboração própria com base em BATYGIN e BROWN (2016); BATYGIN et al. (2019); LAWLER et al. (2023).
+[P021|-] O raio estimado (R⊕) foi obtido por meio de relações massa-raio empíricas utilizadas na literatura para caracterizar planetas do tipo Super-Terra e Sub-Netuno, aplicáveis à faixa de massa considerada para o Planeta Nove. A temperatura de equilíbrio radiativo foi calculada a partir da Lei de Stefan-Boltzmann, considerando o fluxo solar incidente na distância heliocêntrica correspondente a cada cenário orbital. Em ambos os casos, os intervalos apresentados na Tabela 1 dependem do albedo geométrico (pV) considerado, cuja incerteza é discutida na Seção 9.
+[P022|Heading1] 4 SIMULAÇÃO N-CORPOS: ESTRUTURA CONCEITUAL
+[P023|-] A estrutura da simulação N-corpos segue a lógica do integrador WHFast (simplético), implementado no pacote REBOUND (REIN; LIU, 2012). O sistema é inicializado com o Sol, os quatro planetas gigantes com parâmetros reais, as partículas de teste correspondentes aos ETNOs conhecidos e o candidato ao Planeta Nove. Nesta versão, as integrações foram executadas com horizonte de 1 Myr (regime de teste do pipeline); o horizonte secular (≥ 10⁸ anos) necessário para afirmar estabilidade de longo prazo está planejado, mas não foi executado. As integrações monitoram alinhamento apsidal (Δϖ), estabilidade orbital, eventos de ejeção e clustering de inclinação.
+[P024|-] As integrações foram executadas em Python, com REBOUND 5.1.1 (REIN; LIU, 2012), utilizando o integrador simplético WHFast. O passo de integração (Δt) foi derivado, não arbitrado: Δt = P_Júpiter/20, onde P_Júpiter é calculado a partir do semieixo maior de Júpiter (a = 5,2044 UA, catálogo de planetas gigantes em época J2000), resultando em Δt ≈ 0,593644 anos — Júpiter é o corpo mais rápido do sistema integrado (gigantes, candidato ao Planeta Nove e ETNOs), de modo que seu período orbital define o requisito de passo. A conservação de energia e de momento angular foi monitorada quantitativamente ao longo de cada integração: a deriva relativa |ΔE/E₀| é penalizada progressivamente na pontuação de saúde numérica, atingindo penalização máxima em |ΔE/E₀| ≥ 10⁻⁴ (e na pontuação de estabilidade em ≥ 10⁻³); o mesmo critério se aplica à deriva relativa do momento angular. Em integrações de escala secular (≥ 10⁸ anos), o estado é salvo em checkpoints a cada 10⁶ anos, limitando a perda de trabalho por interrupção a no máximo ~1% da integração.
+[P025|-] Uma configuração é retida como viável se satisfaz simultaneamente os seguintes critérios: (a) manutenção do alinhamento apsidal ao longo de toda a integração; (b) ausência de ejeção de ETNOs relevantes; (c) reprodução das inclinações observadas; e (d) estabilidade energética do sistema. A Tabela 2 resume as configurações avaliadas. Nesta versão, apenas dois experimentos de sensibilidade foram executados, ambos em 1 Myr: a rotação do argumento do periélio ω9 do candidato preferido (M=6, a=500 UA, e=0,35, i=20°) e a varredura de inclinação i em torno do limite de escopo do Quadro 2 (i = 31°–35°). Os demais resultados apresentados na Tabela 2 estão marcados como "não executado nesta versão" e dependem de integração secular (≥ 10⁸ anos) para serem avaliados.
+[P026|-] Tabela 2 — Configurações avaliadas na simulação N-corpos
+=== TABLE 2 ===
+ROW: Configuração | Motivo de descarte / aceitação | Status | Δϖ estável
+ROW: M=4, a=300, e=0,2 | Não executado nesta versão | Não executado | —
+ROW: M=10, a=300, e=0,5 | Não executado nesta versão | Não executado | —
+ROW: a=800, e=0,6 | Não executado nesta versão | Não executado | —
+ROW: i = 31°–35° (row4) | Avaliado em 1 Myr: candidate_of_interest nas 5 inclinações; Δscore ≈ 0,098, sem transição | Avaliado (1 Myr) | Não avaliado (secular pendente)
+ROW: M=5, a=400, e=0,3 | Não executado nesta versão | Não executado | —
+ROW: M=6, a=500, e=0,35, i=20° (row6) | Avaliado em 1 Myr: candidate_of_interest nas 5 variações de ω9; Δscore 0,088–0,161; R estável 0,364–0,376 | Avaliado (1 Myr) | Não avaliado (secular pendente)
+ROW: M=7, a=600, e=0,45, i=18° | Não executado nesta versão | Não executado | —
+=== END TABLE 2 ===
+[P027|-] Fonte: elaboração própria com base em protocolo inspirado em REBOUND (REIN; LIU, 2012).
+[P028|Heading1] 5 ANÁLISE HAMILTONIANA SECULAR
+[P029|-] A dinâmica de longo prazo é governada pelo hamiltoniano secular médio, obtido eliminando por médias os ângulos rápidos (longitudes médias). Nesse formalismo, a precessão do argumento do periélio ω̇ de um ETNO acoplado ao Planeta Nove satisfaz a relação:
+[P030|-] ω̇ ∝ M9 · a9−3/2 · f(e9, i9)
+[P031|-] onde f(e9, i9) é uma função das excentricidades e inclinações relativas. Para as configurações avaliadas nesta versão (1 Myr), o formalismo hamiltoniano fornece estimativas analíticas de tempo de precessão secular entre ~620 Myr e ~1.500 Myr — compatíveis com o tempo de mistura observado na distribuição de ETNOs. Esses valores são estimativas do modelo secular, não resultados de integração de longo prazo: a validação por integração secular (≥ 10⁸ anos) permanece pendente nesta versão.
+[P032|-] Ressonâncias de movimento médio de alta ordem com Netuno (3:1 em ~126 UA e 5:1 em ~183 UA) emergem como atratores naturais que podem estabilizar o agrupamento apsidal sem requerer confinamento ativo adicional. Em contrapartida, a ressonância 2:1 (~88 UA) apresenta caráter perturbador para ETNOs nessa região. A exclusão de configurações com a9 < 350 UA, em que as ressonâncias com Netuno destruiriam o agrupamento em menos de 500 Myr, é uma expectativa do modelo secular que ainda não foi validada por integração nesta versão (permanece como decisão de escopo do Quadro 2, não como resultado executado).
+[P033|-] Tabela 3 — Tempos de precessão secular por configuração
+=== TABLE 3 ===
+ROW: Configuração | τ precessão secular | Na janela válida? | Status
+ROW: a₉=400 UA, M=5 M⊕ | ~620 Myr | Sim (600–1.500 Myr) | Viável
+ROW: a₉=500 UA, M=6 M⊕ | ~950 Myr | Sim | Viável
+ROW: a₉=600 UA, M=7 M⊕ | ~1.300 Myr | Sim | Viável
+ROW: a₉=650 UA, M=7 M⊕ | ~1.500 Myr | Limite superior | Marginal
+ROW: a₉=300 UA, M=5 M⊕ | < 300 Myr | Não | Descartado
+=== END TABLE 3 ===
+[P034|-] Fonte: elaboração própria.
+[P035|Heading1] 6 FUSÃO DE DADOS OBSERVACIONAIS
+[P036|-] A estratégia de fusão cruza dois domínios espectrais independentes: o infravermelho — sensível à emissão térmica do objeto — e o óptico com séries temporais — sensível à luz refletida em movimento angular lento. Um candidato genuíno deve apresentar cinemática consistente em ambos os domínios, com paralaxe anual confirmada e movimento próprio μ < 3"/ano.
+[P037|Heading2] 6.1 Infravermelho — IRAS, AKARI e WISE
+[P038|-] Um objeto a 500 UA com temperatura T ≈ 35–45 K (lei de Stefan-Boltzmann, albedo 0,1–0,3) emite com pico em λmax ≈ 70–90 μm segundo a lei de Wien — janela coberta pelos instrumentos IRAS (60/100 μm) e AKARI (90 μm). O fluxo estimado a 500 UA situa-se em 0,5–3 mJy, abaixo do limite de detecção do IRAS (~250 mJy), mas dentro do alcance projetado do Roman Space Telescope (2027+). As varreduras históricas do IRAS e AKARI são inconclusivas: objetos de movimento lento podem ter sido classificados como ruído de fundo.
+[P039|-] O movimento angular esperado para o Planeta Nove é μ ≈ 0,8–1,5"/ano — distinguível de estrelas de fundo em épocas separadas por Δt ≥ 6 meses, mas suficientemente lento para escapar de algoritmos de detecção de movimento projetados para objetos do Sistema Solar interno.
+[P040|Heading2] 6.2 Óptico e séries temporais — LSST
+[P041|-] A magnitude aparente esperada na banda V varia entre V ≈ 22,1 (pV = 0,40, a = 400 UA) e V ≈ 28,0 (pV = 0,06, a = 650 UA). O limite de co-adição do LSST (r ~ 27,5 mag) cobre a maior parte desse intervalo, exceto os cenários de albedo muito baixo (pV < 0,05). A cadência crítica de Δt = 15 dias entre revisitas permite detectar movimentos de ~0,05", superiores ao erro astrométrico do LSST (<0,01").
+[P042|-] Tabela 4 — Magnitude V estimada por albedo e distância
+=== TABLE 4 ===
+ROW: a (UA) | pV = 0,40 | pV = 0,25 | pV = 0,15 | pV = 0,06
+ROW: 400 | V ~ 22,1 | V ~ 23,0 | V ~ 23,9 | V ~ 25,5
+ROW: 500 | V ~ 23,3 | V ~ 24,2 | V ~ 25,1 | V ~ 26,7
+ROW: 600 | V ~ 24,2 | V ~ 25,1 | V ~ 26,0 | V ~ 27,6
+ROW: 650 | V ~ 24,6 | V ~ 25,5 | V ~ 26,4 | V ~ 28,0
+=== END TABLE 4 ===
+[P043|-] Fonte: elaboração própria.
+[P044|Heading1] 7 REDUÇÃO PROGRESSIVA DO ESPAÇO DE PARÂMETROS
+[P045|-] A aplicação sequencial das restrições dinâmicas e observacionais contrai o volume do espaço de parâmetros de maneira hierárquica. A Tabela 5 ilustra o funil de redução conforme implementado neste trabalho (Estágios 0–3); os Estágios 4 e 5 não estão implementados e são explicitamente marcados como não implementados, sem pretensão de que tenham sido avaliados.
+[P046|-] Tabela 5 — Funil de redução progressiva do espaço de parâmetros
+=== TABLE 5 ===
+ROW: N.° | Restrição aplicada | Avaliados / sobreviventes | Volume restante (do total)
+ROW: 0 | Espaço inicial (QMC Halton, N = 20.000) | 20.000 / 20.000 | 100%
+ROW: 1 | Limites físicos analíticos (Estágio 0) | 20.000 / 20.000 | 100%
+ROW: 2 | Separacão de Hill analítica (Estágio 1) | 20.000 / 20.000 | 100%
+ROW: 3 | Estabilidade N-corpos em 1 Myr (Estágio 2) | 200 / 200 | 1,0%
+ROW: 4 | Alinhamento apsidal secular em 1e8 yr (Estágio 3) | 2 / 2 | 0,01%
+ROW: — | Hamiltoniano secular e detectabilidade IR/óptico (Estágios 4–5) | não implementado | —
+=== END TABLE 5 ===
+[P047|-] Fonte: elaboração própria, a partir do artefato real de escaneamento `runs/montecarlo_20260816T001216569981Z/results/` (parameter_space_scan.csv e reduction_funnel_summary.json).
+[P048|-] A redução de volume em cada camada do funil (Tabela 5) foi obtida por amostragem quase-aleatória (quasi-Monte Carlo) de baixa discrepância — sequência de Halton com primos-base [2, 3, 5, 7] — sobre a caixa quadridimensional [M9, a9, e9, i9], com N = 20.000 pontos e semente determinística fixa (20260727), garantindo cobertura reprodutível e mais uniforme do espaço de parâmetros do que uma amostragem pseudoaleatória de mesmo tamanho. O Estágio 0 aplica limites físicos analíticos e o Estágio 1 o proxy analítico de separação de Hill, ambos a todos os 20.000 pontos (100% aprovados nesta execução). O Estágio 2 realiza triagem de estabilidade N-corpos de orçamento reduzido (1 Myr), limitada por capacidade a 200 pontos avaliados (todos aprovados). O Estágio 3 aplica a integração secular completa de alinhamento apsidal (orçamento da Seção 5, 1e8 yr) contra o catálogo real de ETNOs. Nesta execução, a amostra do Estágio 3 foi reduzida de 60 para 2 ramos por restrição de tempo de execução (máquina de 2 núcleos); os 2 ramos avaliados foram aprovados, mas o poder estatístico do funil com essa amostra reduzida não foi recalculado. Pontos que excedem os limites de capacidade são explicitamente marcados como não avaliados, em vez de descartados silenciosamente, de modo que os percentuais reportados na Tabela 5 refletem exatamente o que foi testado, não uma extrapolação. Nota de honestidade: os percentuais estimados de ~45%→28%→15%→8%→3–5% reportados em versões anteriores desta tabela eram expectativas de escopo sem artefato de execução e não são reproduzidos pelos estágios implementados — em todos os estágios executados, 100% dos pontos avaliados foram aprovados.
+[P049|Heading1] 8 SÍNTESE: MODELO FÍSICO CONSISTENTE
+[P050|-] O protocolo completo converge para uma região de confiança no espaço quadridimensional [M9, a9, e9, i9]. O modelo não é uma solução pontual, mas um envelope de parâmetros fisicamente consistente e observacionalmente não contraditado. Os três cenários representativos dentro da zona viável são descritos a seguir.
+[P051|Heading2] 8.1 Cenário de massa baixa
+[P052|-] Massa M9 ≈ 5 M⊕, semi-eixo maior a9 ≈ 420 UA, excentricidade e9 ≈ 0,32, inclinação i9 ≈ 18°. Período orbital de ~7.500 anos. Magnitude visual V ≈ 22,5–24,5 dependendo do albedo. Objeto mais brilhante e mais quente — mais detectável, mas sua ausência em levantamentos passados é ligeiramente problemática se pV > 0,3. Agrupamento apsidal marginalmente compatível com análise do OSSOS.
+[P053|Heading2] 8.2 Cenário intermediário (preferido)
+[P054|-] Massa M9 ≈ 6 M⊕, semi-eixo maior a9 ≈ 500 UA, excentricidade e9 ≈ 0,35–0,40, inclinação i9 ≈ 20°. Período orbital de ~9.000 anos. Melhor compromisso entre força perturbadora e estabilidade no horizonte testado (1 Myr): nesta versão, o candidato row6 foi avaliado em 1 Myr com cinco variações de ω9 (0°, 90°, 180°, 200°, 270°), permanecendo candidate_of_interest em todas (Δscore 0,088–0,161), com R apsidal estável (0,364–0,376). A estabilidade secular (≥ 10⁸ anos) e a ausência de ejeções em escala de Gyr não foram executadas nesta versão e permanecem pendentes de validação. Magnitude V ≈ 23–25 dependendo de albedo — dentro do alcance do LSST se pV > 0,1. Periélio estimado em ~310–325 UA, afélio em ~690–700 UA.
+[P055|Heading2] 8.3 Cenário de massa alta
+[P056|-] Massa M9 ≈ 7 M⊕, semi-eixo maior a9 ≈ 600 UA, excentricidade e9 ≈ 0,45, inclinação i9 ≈ 18°. Período orbital de ~12.000 anos. Perturbações mais fortes explicam ETNOs com q > 65 UA de forma mais natural. Provavelmente próximo ao afélio neste momento — muito frio (T ≈ 35 K) e lento para detecção imediata. Exige LSST co-adicionado e Roman Space Telescope para confirmação.
+[P057|Heading1] 9 PRINCIPAIS INCERTEZAS
+[P058|-] Três variáveis desconhecidas formam o triângulo de indeterminação fundamental do problema, nenhuma resolúvel por análise dinâmica sem dado observacional direto:
+[P059|ListParagraph] Albedo geométrico (pV): o intervalo plausível de 0,05 a 0,75 define uma incerteza de mais de 3 magnitudes na brilhância aparente, determinando se o objeto é detectável pelos levantamentos atuais ou está além do alcance de qualquer instrumento existente.
+[P060|ListParagraph] Argumento do periastro (ω9): completamente indeterminado pela análise dinâmica. Análises de viés de ETNOs sugerem ω9 ≈ 150°–250°, mas com incerteza grande. Define em qual ponto do céu o planeta se encontra atualmente.
+[P061|ListParagraph] Longitude do nodo ascendente (Ω9): degenerada com ω9. Análises probabilísticas favorecem o hemisfério sul celeste, particularmente em latitudes galácticas |b| > 20°.
+[P062|ListParagraph] Anomalia média atual (M0): posição na órbita em J2000 desconhecida. A hipótese de que o objeto está próximo ao afélio — onde passa a maior fração do tempo — é estatisticamente a mais provável, mas não verificável.
+[P063|ListParagraph] Viés de seleção observacional: o OSSOS reduz a significância do agrupamento apsidal de ~3,8σ para ~2,0σ. O sinal pode ser parcialmente artificial, embora os periélios elevados de Sedna e VP113 permaneçam inexplicados por mecanismos alternativos simples.
+[P064|ListParagraph] ETNOs não alinhados (Ammonite): requerem dispersão parcial no modelo, adicionando um grau de liberdade que favorece a9 > 500 UA mas amplia o espaço de soluções.
+[P065|Heading1] 10 PRÓXIMOS PASSOS OBSERVACIONAIS
+[P066|-] A detecção direta ou a refutação definitiva da hipótese do Planeta Nove depende de campanhas observacionais que abordem as três incógnitas fundamentais identificadas acima. Os passos prioritários, em ordem de impacto esperado, são:
+[P067|-] 1. Vera C. Rubin Observatory / LSST (2025–2035): levantamento profundo e controlado do céu austral. Determinará ou refutará o agrupamento de ETNOs com rigor estatístico suficiente para resolver a controvérsia com o OSSOS. Capacidade de detectar objetos V < 27 em movimento angular lento (< 1"/h). A métrica mais importante não é a detecção do planeta, mas o crescimento do catálogo de ETNOs controlados: cada novo objeto com a > 250 UA é um vetor gravitacional adicional que restringe ω9 e Ω9.
+[P068|-] 2. Roman Space Telescope — busca em infravermelho (2027+): sensibilidade superior a 100× ao WISE. Principal candidato à detecção do Planeta Nove via paralaxe de curto prazo em 70–100 μm. Resolverá a incógnita do albedo.
+[P069|-] 3. Cruzamento IRAS/AKARI — varredura histórica: reanálise de dados históricos com algoritmos modernos de detecção de movimento próprio lento pode revelar candidatos previamente descartados como ruído.
+[P070|-] 4. Astrometria Gaia DR4: refinamento da inversão gravitacional via perturbações cumulativas de longo prazo em objetos do Cinturão de Kuiper pode restringir ω9 e Ω9 indiretamente, independentemente de qualquer suposição sobre albedo.
+[P071|-] 5. Sondas distantes (New Horizons): monitoramento de aceleração residual consistente com perturbador massivo distante; limita o produto M9 × a9⁻². Dado complementar, não conclusivo isoladamente.
+[P072|Heading1] REFERÊNCIAS
+[P073|-] BATYGIN, K.; BROWN, M. E. Evidence for a Distant Giant Planet in the Solar System. The Astronomical Journal, v. 151, n. 2, p. 22, 2016.
+[P074|-] BATYGIN, K.; ADAMS, F. C.; BROWN, M. E.; BECKER, J. C. The planet nine hypothesis. Physics Reports, v. 805, p. 1–53, 2019.
+[P075|-] BROWN, M. E.; BATYGIN, K. Observational constraints on the orbit and location of Planet Nine in the outer Solar System. The Astrophysical Journal Letters, v. 824, n. 2, p. L23, 2016.
+[P076|-] CHEN, Y.-T. et al. Discovery and dynamics of a Sedna-like object with a perihelion of 66 au. Nature Astronomy, 2025. doi:10.1038/s41550-025-02595-7.
+[P077|-] DE LA FUENTE MARCOS, C.; DE LA FUENTE MARCOS, R. Extreme trans-Neptunian objects and the Kozai mechanism: signalling the presence of trans-Plutonian planets. Monthly Notices of the Royal Astronomical Society: Letters, v. 443, n. 1, p. L59–L63, 2014.
+[P078|-] LAWLER, S. M. et al. OSSOS: X. How to use a survey simulator: statistical testing of dynamical models against the real Kuiper belt. Frontiers in Astronomy and Space Sciences, v. 5, p. 14, 2018.
+[P079|-] LAWLER, S. M. et al. Perspectives on the Distribution of Orbits of Distant Trans-Neptunian Objects. The Astronomical Journal, v. 165, n. 5, p. 206, 2023.
+[P080|-] NAPIER, K. J. et al. No Evidence for Orbital Clustering in the Extreme Trans-Neptunian Objects. The Planetary Science Journal, v. 2, n. 2, p. 59, 2021.
+[P081|-] REIN, H.; LIU, S.-F. REBOUND: An open-source multi-purpose N-body code for collisional dynamics. Astronomy & Astrophysics, v. 537, p. A128, 2012.
+[P082|-] SHANKMAN, C. et al. OSSOS: Evidence Against the Planet 9 Hypothesis. The Astronomical Journal, v. 156, n. 1, p. 36, 2017.
+[P083|-] TRUJILLO, C. A.; SHEPPARD, S. S. A Sedna-like body with a perihelion of 80 astronomical units. Nature, v. 507, p. 471–474, 2014.

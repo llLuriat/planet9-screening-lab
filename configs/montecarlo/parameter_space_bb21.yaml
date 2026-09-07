@@ -1,0 +1,33 @@
+# Parameter space for the Monte Carlo / quasi-Monte Carlo scan, concentrated
+# around the Brown & Batygin (2021, AJ 162, 219) posterior best-fit, instead
+# of the wide 2016 exploratory range in parameter_space.yaml.
+#
+# Bounds derived from BB21's reported posterior (mean +uncertainty/-uncertainty),
+# also cited textually in Chen et al. (2025, arXiv:2505.15806):
+#   - mass_earth: 6.2 (+2.2/-1.3) M_earth -> range [4.9, 8.4] (mean +/- 1 sigma,
+#     asymmetric uncertainty averaged conservatively for a simple uniform bound)
+#   - a_au: BB21 posterior 380 (+140/-80) AU -> range [300, 520] AU
+#   - e: BB21 point estimate 0.20; no formal posterior width reported in the
+#     source material available to this project. Uses a documented +/-0.10
+#     modelling margin around the point estimate -> range [0.10, 0.30]. This
+#     margin is a project modelling choice, NOT a BB21-reported uncertainty -
+#     state this explicitly in the article.
+#   - i_deg: BB21 posterior 16 +/- 5 deg -> range [11, 21]
+#
+# This is a narrower, posterior-informed alternative to parameter_space.yaml
+# (kept unchanged as the wide BB16 sensitivity option) - not a replacement.
+# Report BOTH scans side by side in the article per the post-audit engineering
+# plan, point 3.
+
+bounds:
+  mass_earth: [4.9, 8.4]
+  a_au: [300.0, 520.0]
+  e: [0.10, 0.30]
+  i_deg: [11.0, 21.0]
+
+method: qmc_halton
+seed: 20260727
+n_points: 20000
+max_stage2_samples: 200
+max_stage3_samples: 2
+stage2_budget: configs/budgets/montecarlo_stage2.yaml

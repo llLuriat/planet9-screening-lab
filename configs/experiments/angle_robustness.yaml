@@ -1,0 +1,24 @@
+experiment_id: angle_robustness
+description: >-
+  Robustness of the screening ranking against the observationally
+  unconstrained orientation angle omega_deg of Planet Nine (decision P0).
+  Base candidate is Cenario 6 - p9_row6_preferred (M=6, a=500, e=0.35,
+  i=20, the article's "Cenario intermediario (preferido)", Secao 8.2 of
+  Artigo_FEBRACE_revisado.docx). omega_deg is swept over a quarter-turn grid
+  that INCLUDES the nominal Fase B value 200 deg so the canonical point is
+  always inside the grid; Omega_deg (270) and mean_anomaly_deg (180) stay at
+  the fixed Fase B values. omega_deg is the physically dominant angle for
+  secular dynamics (apsidal alignment / resonance location); Omega_deg and M0
+  are held fixed to keep the grid tractable.
+
+  Scope: ranking stability of the SCREEN (1 Myr stability screen), not a
+  Gyr-scale secular alignment claim (that stays benchmark-gated).
+
+  To also sweep the full Quadro 2 lineup at each angle, point base_catalog at
+  data/candidates_quadro2.csv (28 variants) - the driver supports it.
+base_catalog: configs/experiments/cenario6_base_candidate.csv
+etno_catalog: data/etnos/catalog_validated.csv
+budget: configs/experiments/robustness_screen.yaml
+seed: 12345
+axes:
+  omega_deg: [0, 90, 180, 200, 270]

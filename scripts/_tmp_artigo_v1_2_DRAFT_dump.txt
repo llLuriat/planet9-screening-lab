@@ -1,0 +1,134 @@
+[P001] PLANET9 SCREENING LAB: TRIAGEM DINÂMICA AUTOMATIZADA E AUDITÁVEL DE CANDIDATOS AO HIPOTÉTICO PLANETA NOVE
+[P002] Alexandre Brito Santana; Lucas Fortuna Nogueira
+[P003] Orientador: Rodrigo Alves de Moura
+[P004] Escola SESI Manuel Querino — Projeto Astros e Aventuras (Iniciação Científica), Salvador, BA, Brasil
+[P005] RESUMO
+[P006] Este trabalho documenta o desenvolvimento do Planet9 Screening Lab: um pipeline headless, automatizado e auditável de triagem dinâmica (screening) de candidatos ao hipotético Planeta Nove (P9), planeta de massa subneptuniana (cerca de 5 a 20 massas terrestres) em órbita excêntrica e distante (semi-eixo maior da ordem de 380 a 980 UA) proposto para explicar o agrupamento orbital de Objetos Transnetunianos Extremos (ETNOs). O objetivo não é localizar P9, mas responder, com controle pareado e rastreabilidade, se um modelo com P9 melhora métricas dinâmicas dos ETNOs em relação ao modelo sem P9. A metodologia integra: catálogo canônico de 16 ETNOs (13 validados + 3 parciais: Ammonite/2023 KQ14, 2017 OF201 e Leleakuhonua/2015 TG387; fonte revisada por pares, época única e referencial heliocêntrico para os 13 validados); modelo de N-corpos mínimo (Sol, gigantes e candidato massivo) integrado com REBOUND/WHFast e passo Δt = P_Júpiter/20; funil de triagem quasi-Monte Carlo (20.000 pontos) em cinco estágios, dois ainda não implementados; oito candidatos do Quadro 2 do projeto; controle pareado com e sem P9; e diagnósticos de estatística circular (Rayleigh e Kuiper) e MEGNO (não calibrado). Nos horizontes executados (1 Myr), os resultados são exploratórios: nenhum candidato supera consistentemente os modelos nulos; o agrupamento apsidal do catálogo não é estatisticamente significativo (p = 0,240; n = 16); o poder estatístico exigiria cerca de 39 ETNOs para detectar concentração ρ = 0,5 (potência de 80%). Não foi possível confirmar a existência do Planeta Nove nem determinar sua órbita; a contribuição é um arcabouço reprodutível e auditável para triagens futuras em horizonte secular.
+[P007] Palavras-chave: Planeta Nove; ETNOs; Simulação de N-corpos; Triagem dinâmica; Estatística circular.
+[P008] 1 INTRODUÇÃO
+[P009] A hipótese do Planeta Nove (P9) propõe um planeta ainda não observado, de massa subneptuniana (cerca de 5 a 20 massas terrestres), em órbita excêntrica e distante, para explicar o agrupamento orbital de corpos do Sistema Solar externo (BATYGIN; BROWN, 2016; BROWN; BATYGIN, 2016). ETNOs são corpos com semi-eixo maior a > 150 UA e periélio q > 30 UA (1 UA é a distância média Terra–Sol). A longitude do periélio ϖ = Ω + ω (mod 360°) combina a longitude do nodo ascendente Ω com o argumento do periélio ω.
+[P010] O principal indício é o agrupamento apsidal: a longitude do periélio ϖ concentrar-se-ia em uma mesma direção para os ETNOs mais distantes (BATYGIN; BROWN, 2016; BROWN; BATYGIN, 2019; BROWN; BATYGIN, 2021). Objetos de periélio alto, como Sedna (q ≈ 76 UA) e 2012 VP113 (q ≈ 80 UA), reforçariam a necessidade de um perturbador distante.
+[P011] Essa interpretação é controversa. Análises com funções de seleção observacional (OSSOS) acham as amostras consistentes com distribuições uniformes de ϖ (SHANKMAN et al., 2017; NAPIER et al., 2021); reanálises com tratamento próprio do viés sustentam o agrupamento (BROWN; BATYGIN, 2019; 2021). O pequeno tamanho das amostras e descobertas recentes agravam a controvérsia: o sednoide 2023 KQ14 (Ammonite) é desalinhado ao agrupamento (CHEN et al., 2025), o candidato a planeta anão 2017 OF201 tem longitude do periélio fora dele (CHENG et al., 2025) e 2015 TG387 é compatível (SHEPPARD et al., 2019).
+[P012] Diante disso, o escopo é delimitado: não se busca descobrir P9 nem determinar sua órbita real, mas construir um pipeline computacional reprodutível e auditável — o Planet9 Screening Lab — para responder, com controle pareado, se um modelo com P9 melhora as métricas dinâmicas dos ETNOs em relação ao controle sem P9. Os objetivos específicos são: (i) catálogo canônico auditável de ETNOs; (ii) modelo mínimo de N-corpos com integrador numérico real; (iii) funil de triagem quasi-Monte Carlo com controle pareado e política explícita de conclusão; (iv) avaliação de oito candidatos do Quadro 2; (v) diagnósticos formais de estatística circular e numérica sem promover candidatos; e (vi) registro de limitações e próximos passos.
+[P013] A Seção 2 descreve materiais e métodos; a Seção 3, resultados e discussão; a Seção 4, as considerações finais. Cada afirmação é classificável como resultado medido, derivado, dado da literatura, hipótese ou pendência; nenhuma afirmação é mais forte do que a evidência realmente executada, medida ou publicada.
+[P014] 2 MATERIAIS E MÉTODOS
+[P015] 2.1 Delineamento e pergunta científica
+[P016] O estudo é pesquisa aplicada, computacional e exploratória, organizada como pipeline headless. H1 afirma que existe uma faixa de candidatos P9 que melhora a coerência dinâmica dos ETNOs; H0, que a distribuição observada pode ser explicada sem P9. Para cada candidato executam-se integrações gêmeas com e sem P9 (mesmo catálogo, gigantes, orçamento e semente). A política de conclusão do repositório limita as afirmações a “triagem exploratória”, “candidato de interesse dentro do protocolo”, “nenhum candidato encontrado” ou “inconclusivo”, proibindo confirmação, descoberta ou determinação de órbita (PLANET9 SCREENING LAB, 2026).
+[P017] 2.2 Catálogo canônico de ETNOs
+[P018] O catálogo canônico reúne 16 ETNOs: 13 validados com elementos orbitais osculadores heliocêntricos (referencial eclíptico J2000, época única 2456800,5 = 23/05/2014 TDB) + 3 objetos parciais (Ammonite/2023 KQ14, 2017 OF201, Leleakuhonua/2015 TG387) em época/frame distintos, selecionados por a > 150 UA e q > 30 UA (Tabela 1). Os elementos provêm da Tabela A1 de DE LA FUENTE MARCOS e DE LA FUENTE MARCOS (2014); a anomalia média M foi derivada de M = λ − ϖ (mod 360°). Critérios de seleção e exclusão ficam registrados em campos de auditoria (selection_reason/selection_notes), evitando escolha manual que favoreça um resultado.
+[P019] O catálogo é um retrato fechado em 2014, não um censo atualizado: 2015 TG387 (SHEPPARD et al., 2019) não integra os 13 objetos usados. O sednoide Ammonite/2023 KQ14 (CHEN et al., 2025) entra com status “parcial” e uso qualitativo — elementos baricêntricos em época 2025-05-05, não propagados à época padrão; uso quantitativo é desautorizado nesta versão.
+[P020] Tabela 1 — Catálogo canônico de ETNOs (n = 16; a > 150 UA, q > 30 UA; época 2456800,5 para os 13 validados; * = parcial em época/frame distinto; referencial heliocêntrico eclíptico J2000).
+
+=== TABLE 1 ===
+Objeto | a (UA) | e | q (UA) | i (°) | ϖ (°)
+2001_FP185 | 220.8 | 0.845 | 34.2 | 30.8 | 186.1
+Sedna | 532.3 | 0.857 | 76.1 | 11.9 | 95.7
+2000_CR105 | 229.9 | 0.808 | 44.2 | 22.7 | 85.3
+2002_GB32 | 209.5 | 0.831 | 35.3 | 14.2 | 213.9
+2003_HB57 | 161.1 | 0.764 | 38.1 | 15.5 | 208.5
+2003_SS422 | 197.4 | 0.800 | 39.4 | 16.8 | 1.1
+2004_VN112 | 333.6 | 0.858 | 47.3 | 25.5 | 33.3
+2005_RH52 | 152.7 | 0.744 | 39.0 | 20.5 | 338.8
+2007_TG422 | 531.9 | 0.933 | 35.6 | 18.6 | 38.8
+2007_VJ305 | 192.4 | 0.817 | 35.2 | 12.0 | 2.9
+2010_GB174 | 368.2 | 0.868 | 48.6 | 21.5 | 118.1
+2010_VZ98 | 156.5 | 0.781 | 34.3 | 4.5 | 71.3
+2012_VP113 | 264.9 | 0.696 | 80.5 | 24.0 | 24.9
+
+[P021] Fonte: catalog_validated.csv do repositório (elaboração própria a partir de DE LA FUENTE MARCOS; DE LA FUENTE MARCOS, 2014). q = a(1 − e) e ϖ = Ω + ω (mod 360°) são derivados; objetos com status 'parcial' (Ammonite/2023 KQ14, 2017 OF201, Leleakuhonua/2015 TG387) são listados ao final com asterisco (ver texto).
+[P022] 2.3 Modelo físico e integração numérica
+[P023] O modelo mínimo contém o Sol, os gigantes Júpiter, Saturno, Urano e Netuno (elementos na época J2000) e os ETNOs como partículas sem massa; com include_p9 verdadeiro, o candidato P9 é adicionado como partícula massiva. Com unidades em ano, UA e massa solar e G = 4π², o período de Júpiter (a = 5,2044 UA) é P ≈ 11,8729 anos. As integrações usam REBOUND 5.1.1 (REIN; LIU, 2012) com o integrador simplético WHFast.
+[P024] O passo não é arbitrado: Δt = P_mín/20, em que P_mín é o período do corpo mais interno (Júpiter), resultando em Δt = 0,593644 ano, derivado em código por planet9lab.physics.recommended_timestep_years e conferido por teste automatizado. O controle pareado exige, por candidato, integrações com e sem P9 idênticas em tudo (sementes [12345] nas execuções; estabilidade entre múltiplas sementes permanece pendente). Integrações seculares usam finalização padronizada e checkpointing a cada 10⁶ anos.
+[P025] Os horizontes devem ser lidos com rigor: as telas desta versão integraram 1 Myr. O orçamento secular configurado prevê 4×10⁹ anos (4 Gyr) como horizonte alvo (execução real pendente); os estágios 3 dos escaneamentos executaram 10⁸ anos como ponto de partida conservador — quando a literatura menciona 4 Gyr (por exemplo, BROWN; BATYGIN, 2016), trata-se de horizonte da literatura, não de execução deste estudo.
+[P026] 2.4 Candidatos ao Planeta Nove
+[P027] Sete candidatos do Quadro 2 do projeto varrem massa (4 a 10 massas terrestres), semi-eixo maior (300 a 800 UA), excentricidade (0,20 a 0,60) e inclinação (18° a 32°) (Tabela 2). Para linhas sem i ou M especificados, os valores foram fixados no centro do Cenário 6 (“cenário intermediário (preferido)”: M = 6 massas terrestres, a = 500 UA, e = 0,35, i = 20°), evitando um grau de liberdade extra não testado por linha.
+[P028] Os ângulos ω9 = 200°, Ω9 = 270° e M0 = 180° (logo, ϖ9 = 110°) são um ponto central único e são assumidos, não medidos: o Quadro 2 não os tabula. O ajuste mais recente (BROWN; BATYGIN, 2021) favorece M ≈ 6,2 massas terrestres, a ≈ 382 UA e ϖ9 ≈ 246,7°, diferindo em cerca de 137° do ϖ9 assumido aqui; o candidato BB21 foi incorporado como oitava linha (row8) e executado em teste de sanidade de 200 anos (rank 1, candidato de interesse, evidência 'fraca'); a discriminação entre as soluções BB16 e BB21 exige a execução secular no horizonte alvo de 4 Gyr, ainda pendente.
+[P029] Tabela 2 — Candidatos P9 avaliados (Quadro 2 do artigo original do projeto).
+
+=== TABLE 2 ===
+Candidato | M (massas terrestres) | a (UA) | e | i (°)
+p9_row1_lowmass_close | 4 | 300 | 0.20 | 20
+p9_row2_highmass_close | 10 | 300 | 0.50 | 20
+p9_row3_far_eccentric | 6 | 800 | 0.60 | 20
+p9_row4_incl_boundary | 6 | 500 | 0.35 | 32
+p9_row5_partial_alignment | 5 | 400 | 0.30 | 20
+p9_row6_preferred | 6 | 500 | 0.35 | 20
+p9_row7_highmass_viable | 7 | 600 | 0.45 | 18
+
+[P030] Fonte: dados/candidates_quadro2.csv (elaboração própria). Todos os candidatos usam ω9 = 200°, Ω9 = 270°, M0 = 180°, exceto row8 (BB21): ω9 = 246,7°, Ω9 = 0°, M0 = 180°, derivados do ajuste de BROWN; BATYGIN (2021) (assumidos; não medidos).
+[P031] 2.5 Métricas dinâmicas e scoring
+[P032] Para cada ramo (com/sem P9) o pipeline registra: taxa de sobrevivência dos ETNOs; derivas relativas máximas de energia e de momento angular (|ΔE/E0|, |ΔL/L0|); o comprimento R do vetor resultante do agrupamento apsidal, estatística circular (R = 0 uniforme; R = 1 alinhamento perfeito); e o alinhamento angular médio, 1 − (distância angular média à direção anti-alinhada com P9, ϖ9 + 180°)/180° (não circular). O score dinâmico é a média ponderada dessas componentes (Tabela 3); o indicador central é Δscore = score(com P9) − score(sem P9).
+[P033] Tabela 3 — Componentes e pesos do score dinâmico (configuração default).
+
+=== TABLE 3 ===
+Componente | Peso | Função no score
+Agrupamento apsidal (R) | 0,20 | Premia maior concentração de ϖ com P9
+Alinhamento angular médio | 0,25 | Premia ETNOs anti-alinhados a P9
+Taxa de sobrevivência | 0,20 | Premia retenção dos ETNOs
+Estabilidade | 0,20 | Penaliza deriva |ΔE/E0| acima de 10⁻³
+Saúde numérica | 0,15 | Penaliza deriva acima de 10⁻⁴
+
+[P034] Fonte: configs/scoring/default_weights.yaml e planet9lab/metrics.py (elaboração própria). Limiares operacionais: Δscore mínimo de interesse 0,08; Δscore abaixo de 0,05 considerado ruim; sobrevivência mínima 0,80.
+[P035] Blockers científicos registrados em audit/blockers.json podem limitar o nível de evidência sem invalidar a execução: a ausência de modelo de viés observacional (no_observational_bias_model) limita a evidência máxima a “fraco”; candidatos com i ≥ 80° recebem aviso de regime (Kozai–Lidov não validado); e, quando modelos nulos não são superados, permanece ativo o blocker null_model_not_exceeded.
+[P036] 2.6 Funil de triagem quasi-Monte Carlo
+[P037] O funil amostra o espaço de parâmetros [M, a, e, i] por quasi-Monte Carlo (sequência determinística de Halton), N = 20.000 pontos e semente 20260727, nos limites M ∈ [5, 20] massas terrestres, a ∈ [380, 980] UA, e ∈ [0,1; 0,8] e i ∈ [0°, 40°]. Esses limites são escolha metodológica documentada, fundamentada na faixa de 2016 (BROWN; BATYGIN, 2016) e em estudos de ressonâncias e inclinações mais baixas (MALHOTRA et al., 2016; MILLHOLLAND; LAUGHLIN, 2017); não se afirma que o P9 real esteja necessariamente nessa faixa. A faixa preferida de periélio 150–350 UA da literatura é coluna diagnóstica, não filtro físico.
+[P038] O funil tem cinco estágios: 0, limites físicos analíticos (todos os pontos); 1, separação de Hill em relação a Netuno (todos); 2, estabilidade N-corpos de 1 Myr, limitada por amostragem (max_stage2_samples = 200); 3, alinhamento apsidal secular contra o catálogo real (max_stage3_samples); e 4 (Hamiltoniano secular) e 5 (detectabilidade fotométrica), não implementados. Pontos excedentes às cotas ficam como not_evaluated_capacity_limit, nunca descartados. A execução autorizada usou max_stage3_samples reduzido de 60 para 2 por restrição de tempo de computo (Seção 3.2).
+[P039] 2.7 Robustez e diagnósticos
+[P040] Fora do funil há comandos de robustez: leave-one-out, convergência sob refinamento de passo (dt, dt/2, dt/4), validação cruzada com IAS15 e modelos nulos reais por integração REBOUND (shuffle_varpi, randomize_angles, no_p9_catalog_baseline), checagem de viés de seleção (selection-bias-check), além do MEGNO (experimental, não calibrado) e dos testes formais de Rayleigh e Kuiper (somente leitura; não substituem o critério ad hoc do funil).
+[P041] 2.8 Execuções e ambiente computacional
+[P042] As execuções da Seção 3 foram realizadas em etapas anteriores do projeto, com REBOUND real, e estão nomeadas na documentação: telas experiment_angle_robustness e experiment_i_boundary_scan (1 Myr) e varredura de funil montecarlo_20260816T001216569981Z (PLANET9 SCREENING LAB, 2026). Os artefatos brutos (runs/) não acompanham o pacote distribuído, que os regenera por comando (python main.py screen). A suíte registra 149 testes aprovados (pytest) e lint limpo (ruff). O custo computacional foi medido em hardware real (Intel i5-14400; results/hardware_benchmark.json, 2026-09-03): 347.886 anos simulados/s no orçamento medium, ou seja, = 6,4 h por par de controle em 4 Gyr e = 25,6 h para os 8 candidatos do Quadro 2. A projeção anterior (sandbox, 2 núcleos, ~14,6 h/par) foi substituída por esta medição.
+[P043] 3 RESULTADOS E DISCUSSÃO
+[P044] 3.1 Estrutura angular do catálogo canônico
+[P045] A Figura 1 mostra a distribuição das longitudes do periélio dos 13 ETNOs canônicos: o vetor resultante tem R = 0,365 na direção média ≈ 57°. Apesar da concentração visual, o teste de Rayleigh (Z = 1,73) fornece p = 0,178, e o teste de Kuiper fornece V* = 1,46 (p = 1,0); portanto, para α = 0,05, a hipótese de distribuição uniforme de ϖ não é rejeitada (Tabela 4). Incluir o sednoide Ammonite/2023 KQ14 (status parcial) reduz R para 0,283 (p = 0,333), consistente com sua órbita desalinhada ao agrupamento (CHEN et al., 2025).
+[P046] Figura 1 — Distribuição polar das longitudes do periélio (ϖ) dos 13 ETNOs do catálogo canônico (pontos azuis) e vetor resultante (seta vermelha, R = 0,365 na direção ≈ 57°). Fonte: elaboração própria a partir de catalog_validated.csv.
+[P047] Esses números são derivados do catálogo pelo código do próprio projeto e não podem ser lidos como evidência de ausência de agrupamento: com n = 16, o poder é baixo. Seriam necessários cerca de 39 ETNOs para detectar concentração ρ = 0,5 com 80% de poder (α = 0,05); cerca de 107 para ρ = 0,3 e 20 para ρ = 0,7 — todos acima da amostra atual. Isso é coerente com SHANKMAN et al. (2017) e NAPIER et al. (2021) e não resolve a divergência com BROWN e BATYGIN (2021).
+[P048] Tabela 4 — Diagnósticos circulares do catálogo (elaboração própria, derivados do catálogo; α = 0,05).
+
+=== TABLE 4 ===
+Amostra | n | R | Z | p (Rayleigh) | V* (Kuiper) | p (Kuiper)
+13 ETNOs validados | 13 | 0,365 | 1,73 | 0,178 | 1,46 | 1,0
++ Ammonite (parcial) | 14 | 0,283 | 1,12 | 0,333 | 1,30 | 1,0
+
+[P049] Fonte: catalog_validated.csv e planet9lab (elaboração própria). Nenhuma amostra rejeita uniformidade em α = 0,05.
+[P050] 3.2 Funil de triagem quasi-Monte Carlo
+[P051] A varredura registrada aprovou 20.000 pontos nas etapas 0 (limites físicos) e 1 (separação de Hill); na etapa 2 (estabilidade N-corpos de 1 Myr) avaliou 200 pontos por cota amostral (1,0% do total, todos aprovados); e na etapa 3 (alinhamento apsidal secular de 10⁸ anos) avaliou 2 pontos (0,01% do total, ambos aprovados) (Tabela 5). Os estágios 4 e 5 não estão implementados.
+[P052] Essas porcentagens (1,0% e 0,01%) refletem limites de capacidade amostral, não eliminação física. Estimar a taxa “física” de sobrevivência do espaço de parâmetros exigiria a amostra completa do estágio 3 (60 ramos), não executada por restrição de tempo; o poder com a amostra reduzida não foi recalculado. O resultado não sustenta afirmação sobre a fração de parâmetros viáveis de P9.
+[P053] Tabela 5 — Funil de triagem quasi-Monte Carlo (execução registrada; N = 20.000 pontos).
+
+=== TABLE 5 ===
+Estágio | Critério | Avaliados | Aprovados | Frequência no total
+0 | Limites físicos | 20.000 | 20.000 | 100%
+1 | Separação de Hill (Netuno) | 20.000 | 20.000 | 100%
+2 | Estabilidade N-corpos (1 Myr) | 200 (cota) | 200 | 1,0% (avaliados)
+3 | Alinhamento secular (10⁸ anos) | 2 (cota) | 2 | 0,01% (avaliados)
+4 e 5 | Hamiltoniano secular / detectabilidade | — | — | não implementado
+
+[P054] Fonte: execução montecarlo_20260816T001216569981Z registrada na documentação do repositório (elaboração própria). Porcentagens finais refletem cotas amostrais, não eliminação física.
+[P055] 3.3 Telas exploratórias de 1 Myr
+[P056] Três experimentos foram executados: duas telas de sensibilidade em horizonte de 1 Myr com o catálogo canônico (rotação do ângulo ω9 do candidato preferido row6: 0°, 90°, 180°, 200°, 270°; e varredura de inclinação ao redor do limite i > 30°, row4: 31° a 35°, com Ω9 = 270° e M0 = 180°) e um teste de sanidade de 200 anos do candidato row8/BB21 (rank 1, candidato de interesse, evidência 'fraca'). Todas as variantes foram “candidatos de interesse” pelo critério default (ad hoc ponderado). Isso não significa significância: no teste formal de Rayleigh nenhum é estatisticamente significativo (p entre 0,16 e 0,24; n = 16) e, nos modelos nulos reais, nenhum superou consistentemente os três nulos (blocker null_model_not_exceeded ativo).
+[P057] A robustez angular é limitada: apenas o candidato preferido row6 tem evidência de robustez a ω9 (5 valores, todos candidatos de interesse); as outras sete linhas do Quadro 2 não têm essa evidência. Nenhuma execução avança da triagem exploratória para um segundo estágio de confirmação: os resultados são compatíveis com H1 apenas no sentido fraco de “não excluem candidatos de interesse” — um resultado negativo honesto.
+[P058] Diagnósticos auxiliares corroboram a leitura: derivas relativas de energia e momento angular ficaram abaixo dos divisores 10⁻³ e 10⁻⁴ usados no scoring, sem falhas numéricas nas telas de 1 Myr — saúde numérica no horizonte executado, não prova de estabilidade secular. O MEGNO, experimental e isolado do funil, respondeu à semente em orçamento curto (⟨Y⟩ = 1,7746 na semente 42 e 2,0930 na 43; sistema regular ≈ 2,0), mas, não calibrado, não é usado como argumento de estabilidade em Gyr.
+[P059] 3.4 Discussão integrada e limitações
+[P060] Em conjunto, os resultados sustentam leitura conservadora: o pipeline opera de forma reprodutível e auditável (149 testes aprovados; controle pareado), mas a evidência dinâmica é fraca e exploratória — agrupamento não significativo, funil com amostra secular mínima, telas de 1 Myr que não superam modelos nulos e nenhum candidato robusto para avançar a um segundo estágio. As limitações estruturais: ausência de modelo de viés observacional (limita a evidência máxima a “fraco”), catálogo pequeno fechado em 2014, ângulos assumidos divergentes do ajuste de BROWN e BATYGIN (2021), semente única e estágios 4–5 do funil não implementados.
+[P061] A literatura recente reforça as ressalvas: 2015 TG387 (SHEPPARD et al., 2019), 2023 KQ14 (CHEN et al., 2025) e 2017 OF201 (CHENG et al., 2025) apoiam ou desafiam o agrupamento, e a controvérsia sobre viés observacional segue em aberto (SHANKMAN et al., 2017; NAPIER et al., 2021; BROWN; BATYGIN, 2021). Não há evidência dinâmica que confirme a existência do Planeta Nove nem determine sua órbita.
+[P062] 4 CONSIDERAÇÕES FINAIS
+[P063] O que o projeto testou foi a arquitetura de triagem: catálogo auditável, modelo físico mínimo reproduzível, funil quasi-Monte Carlo com controle pareado, telas de 1 Myr e diagnósticos formais, executados com REBOUND real e proveniência registrada. Os resultados robustos dentro do protocolo: (a) o catálogo de 16 ETNOs não apresenta agrupamento apsidal significativo (p = 0,240); e (b) nenhum candidato superou consistentemente os modelos nulos nem alcançou significância formal.
+[P064] Também é explícito o que não foi demonstrado: não se confirmou a existência do Planeta Nove nem se determinou sua órbita real; não se validou estabilidade em Gyr (telas de 1 Myr); implementou-se apenas um modelo inicial simplificado de viés de seleção (angle-only), que não reproduz o clustering observado mas não o descarta como artefato; e nenhum candidato avançou a segundo estágio. À pergunta central — “o projeto encontrou o Planeta Nove?” — a resposta é não: a evidência disponível não permite confirmar a existência do Planeta Nove.
+[P065] A contribuição é metodológica: um arcabouço aberto, reprodutível e auditável de triagem dinâmica, com política de conclusão que impede afirmações mais fortes do que a evidência. Como próximos passos: (i) medir o custo no hardware real; (ii) executar as telas seculares completas (10⁸ anos) dos oito candidatos, com ângulos reavaliados frente a BROWN e BATYGIN (2021); (iii) elevar a amostra do estágio 3 e recalcular o poder; e (iv) implementar modelo de viés observacional e testar múltiplas sementes. Somente então a triagem exploratória poderia tornar-se análise confirmatória.
+[P066] REFERÊNCIAS
+[P067] BATYGIN, K.; BROWN, M. E. Evidence for a distant giant planet in the Solar System. The Astronomical Journal, v. 151, n. 2, p. 22, 2016. DOI: 10.3847/0004-6256/151/2/22.
+[P068] BROWN, M. E.; BATYGIN, K. Observational constraints on the orbit and location of Planet Nine in the outer Solar System. The Astrophysical Journal Letters, v. 824, n. 2, p. L23, 2016. DOI: 10.3847/2041-8205/824/2/L23.
+[P069] BROWN, M. E.; BATYGIN, K. Orbital clustering in the distant Solar System. The Astronomical Journal, v. 157, n. 2, p. 62, 2019. DOI: 10.3847/1538-3881/aaf051.
+[P070] BROWN, M. E.; BATYGIN, K. The orbit of Planet Nine. The Astronomical Journal, v. 162, n. 5, p. 219, 2021. DOI: 10.3847/1538-3881/ac2056.
+[P071] CHEN, Y.-T. et al. Discovery and dynamics of a Sedna-like object with a perihelion of 66 au. Nature Astronomy, v. 9, n. 9, p. 1309-1316, 2025. DOI: 10.1038/s41550-025-02595-7.
+[P072] CHENG, S.; LI, J.; YANG, E. Discovery of a dwarf planet candidate in an extremely wide orbit: 2017 OF201. arXiv:2505.15806, 2025. Disponível em: https://arxiv.org/abs/2505.15806. Acesso em: 3 set. 2026.
+[P073] DE LA FUENTE MARCOS, C.; DE LA FUENTE MARCOS, R. Extreme trans-Neptunian objects and the Kozai mechanism: signalling the presence of trans-Plutonian planets. Monthly Notices of the Royal Astronomical Society: Letters, v. 443, n. 1, p. L59-L63, 2014. DOI: 10.1093/mnrasl/slu084.
+[P074] MALHOTRA, R.; VOLK, K.; WANG, X. Corralling a distant planet with extreme resonant Kuiper belt objects. The Astrophysical Journal Letters, v. 824, n. 2, p. L22, 2016. DOI: 10.3847/2041-8205/824/2/L22.
+[P075] MILLHOLLAND, S.; LAUGHLIN, G. Constraints on Planet Nine’s orbit and sky position within a framework of mean-motion resonances. The Astronomical Journal, v. 153, n. 3, p. 91, 2017. DOI: 10.3847/1538-3881/153/3/91.
+[P076] NAPIER, K. J. et al. No evidence for orbital clustering in the extreme trans-Neptunian objects. The Planetary Science Journal, v. 2, n. 2, p. 59, 2021. DOI: 10.3847/PSJ/abe53e.
+[P077] PLANET9 SCREENING LAB. Pipeline headless de triagem dinâmica do Planeta Nove. Salvador, 2026. Disponível em: https://github.com/llLuriat/planet9-screening-lab. Acesso em: 3 set. 2026.
+[P078] REIN, H.; LIU, S.-F. REBOUND: an open-source multi-purpose N-body code for collisional dynamics. Astronomy & Astrophysics, v. 537, p. A128, 2012. DOI: 10.1051/0004-6361/201118085.
+[P079] SHANKMAN, C. et al. OSSOS. VI. Striking biases in the detection of large semimajor axis trans-Neptunian objects. The Astronomical Journal, v. 154, n. 2, p. 50, 2017. DOI: 10.3847/1538-3881/aa7aed.
+[P080] STEPHENS, M. A. Use of the Kolmogorov-Smirnov, Cramér-von Mises and related statistics without extensive tables. Journal of the Royal Statistical Society: Series B (Methodological), v. 32, n. 1, p. 115-122, 1970. DOI: 10.1111/j.2517-6161.1970.tb00821.x.
+[P081] ZAR, J. H. Biostatistical Analysis. 4. ed. Upper Saddle River: Prentice Hall, 1999.
+[P082] SHEPPARD, S. S.; TRUJILLO, C. A.; THOLEN, D. J.; KAIB, N. A new high perihelion trans-Plutonian inner Oort Cloud object: 2015 TG387. The Astronomical Journal, v. 157, n. 4, p. 139, 2019. DOI: 10.3847/1538-3881/ab0895.

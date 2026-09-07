@@ -1,0 +1,19 @@
+experiment_id: i_boundary_scan
+description: >-
+  Line-4 (i > 30 deg cut) boundary probe (decision P2): instead of the single
+  i=32 deg point in the canonical ranking, sweep the inclination across the
+  line-4 boundary to locate where the screen's stability/detectability
+  transitions. Base candidate is p9_row4_incl_boundary from the article's
+  Quadro 2 (M=6, a=500, e=0.35, omega/Omega/M0 = Fase B 200/270/180), with the
+  nominal i=32 probe included in the grid. Run outside the canonical 7-candidate
+  ranking so the canonical max_candidates cap (7) and the ranking comparison
+  stay untouched.
+
+  Scope: sensitivity of the SCREEN (1 Myr stability screen), not a Gyr-scale
+  secular alignment claim.
+base_catalog: configs/experiments/line4_base_candidate.csv
+etno_catalog: data/etnos/catalog_validated.csv
+budget: configs/experiments/robustness_screen.yaml
+seed: 12345
+axes:
+  i_deg: [31, 32, 33, 34, 35]
