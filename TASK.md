@@ -269,3 +269,49 @@ Executor deve:
   (insumos já mapeados, template CLI pronto) e (b) Tarefa B; Tarefa C
   segue aguardando autorização explícita + benchmark na máquina que for
   rodar.
+
+### 2026-09-07 20:30Z Cline (Executor) — Módulo de viés observacional: H-prior do SBDB
+- Status: concluído
+- O que foi feito / resultado real:
+  - **Dados H do JPL SBDB** — `data/etnos/h_values.csv` criado com 16 valores
+    de magnitude absoluta H (um por ETNO do `catalog_validated.csv`),
+    consultados via `sbdb.api?sstr=<des>&phys-par=1` em 2026-09-07. Cada
+    linha tem `object`, `h`, `ref` (solution identifier do SBDB),
+    `sigma` (quando disponível), `notes`. Attribution doc em
+    `data/etnos/h_values_attribution.md` com URL, query pattern, e
+    albedo (0,10 Sheppard & Trujillo 2016 AJ 152:221).
+  - **Código `planet9lab/selection_bias.py`**:
+    - `load_h_catalog(path)` lê CSV (pula linhas `#`), valida colunas
+      `object`/`h`, retorna lista de `(fullname, h_value)`.
+    - `_depth_prob_from_h(h, V_lim)` = stand-in linear: base da profundidade
+      (1 − 0.15·(24.5−V_lim)) menos penalidade 0.12 por magnitude acima da
+      mediana (6.5); objetos mais brilhantes NÃO são boostados
+      (conservativo). TODO documentado: substituir por V = H + 5 log10(r·Delta)
+      quando a população sintética carregar distância heliocêntrica.
+    - `ObservationalBiasConfig` ganha `h_catalog_path` (default
+      `data/etnos/h_values.csv`) e `albedo_default` (0,10, validador
+      [0.01, 0.60]). Novo `bias_model: h_prior_from_catalog`.
+    - `generate_synthetic_population()` agora aceita `h_catalog` (lista de
+      H) e sorteia um H por objeto (com reposição) — população sintética
+      replica o brilho da amostra real, ângulos continuam uniformes.
+    - `apply_selection_function()` usa `_depth_prob_from_h()` por objeto
+      quando `h_catalog` fornecido (em vez de probabilidade fixa).
+    - `selection_bias_check()` retorna `h_prior_source`, `n_h_values`,
+      `h_min/h_max/h_median` no resultado; `synthetic_R` continua reportado.
+  - **Testes** — `tests/test_selection_bias.py` ganha 11 novos testes
+    (total 162): h_prior sob `h_prior_from_catalog`, guardas anti-vacuo,
+    validação de albedo fora do range, reprodutibilidade real vs sintético,
+    deterministicidade, e shape do resultado.
+  - **`configs/science/observational_bias.yaml`** — alterado
+    `bias_model: none` → `bias_model: h_prior_from_catalog`.
+  - **`docs/LIMITACOES.md`** — seção do modelo de viés atualizada com a
+    nova versão H-prior, limitações documentadas (angle-only, stand-in
+    linear não calibrado, TODO de magnitude aparente real), e
+    atribuição SBDB.
+  - Nenhum teste existente quebrado (baseline 151 → 162); ruff limpo.
+- Commit: `4adec0f` (6 files changed, 399 insertions, 59 deletions)
+- Próximo passo: Auditor decide — (a) refinar o modelo de viés com
+  magnitude aparente real (requer distância/tamanho/albedo sintéticos,
+  footprint de survey), (b) executar `selection-bias-check` em runs reais
+  com a nova config, ou (c) avançar para Tarefa B.
+
