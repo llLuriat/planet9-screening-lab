@@ -3,9 +3,11 @@ import random
 
 from planet9lab.loaders import load_etnos
 from planet9lab.selection_bias import (
+    _depth_prob_from_h,
     apply_selection_function,
     generate_synthetic_population,
     load_bias_config,
+    load_h_catalog,
     real_catalog_varpis,
     run_selection_bias_check,
     selection_bias_check,
@@ -20,7 +22,9 @@ REAL_ETNO_CATALOG = "data/etnos/catalog_validated.csv"
 
 def test_load_bias_config_reads_science_yaml():
     config = load_bias_config("configs/science/observational_bias.yaml")
-    assert config.bias_model == "none"
+    assert config.bias_model == "h_prior_from_catalog"
+    assert config.h_catalog_path == "data/etnos/h_values.csv"
+    assert config.albedo_default == 0.10
 
 
 def test_generate_synthetic_population_shape_and_angle_ranges():
@@ -220,3 +224,106 @@ def test_unfavorable_bias_check_keeps_no_observational_bias_model_blocker(tmp_pa
     assert "no_observational_bias_model" in ids
     assert "selection_bias_not_ruled_out" in ids
     assert "etno_catalog_not_fully_validated" in ids
+
+
+# New tests for the H-prior integration (observational bias model v1 with SBDB magnitudes)
+
+
+def test_load_h_catalog_reads_csv():
+    catalog = load_h_catalog("data/etnos/h_values.csv")
+    assert len(catalog) == 16
+    names = {name for name, _ in catalog}
+    assert "90377 Sedna (2003 VB12)" in names
+    assert "541132 Leleakuhonua (2015 TG387)" in names
+    for _, h in catalog:
+        assert isinstance(h, float)
+        assert h > 0
+
+
+def test_load_h_catalog_raises_on_missing_file():
+    import pytest
+    with pytest.raises(FileNotFoundError):
+        load_h_catalog("data/etnos/does_not_exist.csv")
+
+
+def test_load_h_catalog_raises_on_empty_csv(tmp_path):
+    import pytest
+    empty = tmp_path / "empty.csv"
+    empty.write_text("# comment only\nobject,h\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="contains no H values"):
+        load_h_catalog(empty)
+
+
+def test_depth_prob_from_h_deterministic():
+    assert _depth_prob_from_h(7.0, 24.5) == _depth_prob_from_h(7.0, 24.5)
+
+
+def test_depth_prob_from_h_fainter_objects_have_lower_probability():
+    bright = _depth_prob_from_h(3.0, 24.5)
+    median = _depth_prob_from_h(6.5, 24.5)
+    faint = _depth_prob_from_h(8.5, 24.5)
+    assert bright == median  # brighter than median is NOT boosted (conservative)
+    assert faint < median    # fainter than median is penalized
+    assert 0.0 <= faint <= bright <= 1.0
+
+
+def test_depth_prob_from_h_deeper_survey_increases_probability():
+    shallow = _depth_prob_from_h(8.0, 22.0)
+    deep = _depth_prob_from_h(8.0, 24.5)
+    assert deep > shallow
+    assert 0.0 <= shallow <= 1.0
+    assert 0.0 <= deep <= 1.0
+
+
+def test_generate_synthetic_population_with_h_prior_assigns_h_values():
+    h_prior = [1.5, 6.16, 6.14, 7.8]
+    pop = generate_synthetic_population(random.Random(7), n=50, h_prior_values=h_prior)
+    assert len(pop) == 50
+    for row in pop:
+        assert "h_value" in row
+        assert row["h_value"] in h_prior
+    assert all(0 <= row["omega_deg"] < 360 for row in pop)
+    assert all(0 <= row["Omega_deg"] < 360 for row in pop)
+    assert all(0 <= row["mean_anomaly_deg"] < 360 for row in pop)
+
+
+def test_generate_synthetic_population_without_h_prior_has_no_h():
+    pop = generate_synthetic_population(random.Random(7), n=30)
+    assert len(pop) == 30
+    for row in pop:
+        assert "h_value" not in row
+
+
+def test_generate_synthetic_population_with_h_prior_is_deterministic():
+    h_prior = [1.5, 6.16, 6.14, 7.8]
+    a = generate_synthetic_population(random.Random(42), n=40, h_prior_values=h_prior)
+    b = generate_synthetic_population(random.Random(42), n=40, h_prior_values=h_prior)
+    c = generate_synthetic_population(random.Random(43), n=40, h_prior_values=h_prior)
+    assert a == b
+    assert a != c
+
+
+def test_apply_selection_function_with_h_uses_per_object_depth():
+    h_prior = [1.5, 8.5]
+    pop = generate_synthetic_population(random.Random(7), n=200, h_prior_values=h_prior)
+    survivors = apply_selection_function(
+        pop, rng=random.Random(99), limiting_magnitude_v=24.5,
+        sky_coverage_deg2=40000.0, min_tracking_arc_years=0.5,
+    )
+    assert 0 < len(survivors) <= len(pop)
+
+
+def test_selection_bias_check_with_h_prior_reports_h_prior_stats(tmp_path):
+    run_dir = _write_minimal_run(tmp_path, seed=20260903)
+    result_path = run_selection_bias_check(run_dir, "configs/science/observational_bias.yaml")
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    assert result["bias_model"] == "h_prior_from_catalog"
+    assert result["h_prior_source"] == "data/etnos/h_values.csv"
+    stats = result["h_prior_stats"]
+    assert stats is not None
+    assert stats["h_prior_n"] == 16
+    assert stats["h_prior_min"] <= stats["h_prior_median"] <= stats["h_prior_max"]
+    assert stats["h_prior_min"] <= stats["h_prior_mean"] <= stats["h_prior_max"]
+    assert stats["h_prior_min"] <= 2.0
+    assert stats["h_prior_max"] >= 7.0
+

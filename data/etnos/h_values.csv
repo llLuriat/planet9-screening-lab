@@ -1,0 +1,37 @@
+# H values from JPL Small-Body Database (SBDB) API
+# Queried: 2026-09-07
+# Source: https://ssd-api.jpl.nasa.gov/sbdb.api (NASA/JPL SSD/CNEOS)
+# Query pattern: sbdb.api?sstr=<name>&phys-par=1 (see SBDB API v1.3 docs)
+#
+# Each row is the absolute magnitude H (V-band, at 1 AU from Sun and observer)
+# for one of the 16 ETNOs in data/etnos/catalog_validated.csv.
+# The catalog CSV itself has no H column — these values come from SBDB
+# and are used as the prior for the synthetic population's brightness
+# in the observational bias model (h_prior_from_catalog).
+#
+# Usage: these values are drawn with replacement to assign H to each synthetic
+# object in generate_synthetic_population(), so the synthetic population
+# replicates the real sample's brightness distribution while angles remain
+# uniform-random. The per-object depth survival probability in
+# apply_selection_function() then depends on H (brighter objects survive
+# more often), replacing the old fixed-probability approximation.
+#
+# Attribution: NASA/JPL SBDB (https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html).
+# Each ref is the SBDB solution identifier for the H value.
+object,h,ref,sigma,notes
+90377 Sedna (2003 VB12),1.50,MPO981708,,
+82158 (2001 FP185),6.16,E2025N01,,
+148209 (2000 CR105),6.14,MPO694286,,
+(2002 GB32),7.80,MPO339371,,
+506479 (2003 HB57),7.50,MPO745323,,
+(2003 SS422),7.20,E2021W43,.22654,autocmod 2.9c
+474640 Alicanto (2004 VN112),6.46,MPO660785,,
+(2005 RH52),7.43,MPO639897,,
+523622 (2007 TG422),6.47,MPO701369,,
+527603 (2007 VJ305),6.86,MPO701444,,
+(2010 GB174),6.74,E2021B25,,
+445473 (2010 VZ98),5.04,MPO984982,,
+(2012 VP113),4.05,E2024-WI8,,
+(2023 KQ14),6.98,E2026K71,.43264,autocmod 3.0f
+(2017 OF201),3.49,E2025K72,.4506,autocmod 3.0f
+541132 Leleakuhonua (2015 TG387),5.57,MPO701700,.13285,autocmod 2.6n

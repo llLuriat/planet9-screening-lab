@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import csv
 import json
 import random
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from .artifacts import (  # noqa: F401 - write_csv reserved for the Step 5c artifact writer
     ensure_dir,
@@ -27,6 +28,21 @@ class ObservationalBiasConfig(BaseModel):
     sky_coverage_deg2: float = 20000.0
     min_tracking_arc_years: float = 2.0
     n_synthetic: int = 5000
+    h_catalog_path: str = Field(
+        default="data/etnos/h_values.csv",
+        description="Path to CSV of real catalog H values (SBDB). Used as prior for synthetic population brightness when bias_model != 'none'.",
+    )
+    albedo_default: float = Field(
+        default=0.10,
+        description="Assumed geometric albedo for diameter estimation when no per-measurement value is available. Source: Sheppard & Trujillo (2016), AJ 152:221.",
+    )
+
+    @field_validator("albedo_default")
+    @classmethod
+    def _albedo_in_range(cls, value: float) -> float:
+        if not (0.01 <= value <= 0.60):
+            raise ValueError(f"albedo_default {value} outside plausible TNO range [0.01, 0.60]")
+        return value
 
 
 def load_bias_config(path: str | Path) -> ObservationalBiasConfig:
@@ -40,21 +56,93 @@ def load_bias_config(path: str | Path) -> ObservationalBiasConfig:
     return ObservationalBiasConfig.model_validate(raw)
 
 
-def generate_synthetic_population(rng: random.Random, n: int) -> list[dict]:
+def load_h_catalog(path: str | Path) -> list[tuple[str, float]]:
+    """Load the real catalog H values from a CSV.
+
+    Returns a list of (fullname, h_value) tuples. The CSV must have at least
+    ``object`` and ``h`` columns; ``#``-prefixed comment lines and a header
+    row are expected (see ``data/etnos/h_values.csv``).
+
+    Used as the empirical prior for the synthetic population's brightness:
+    each synthetic object draws its H from this list (with replacement), so
+    the synthetic population replicates the real sample's magnitude
+    distribution while its angles stay uniform-random.
+    """
+    h_values: list[tuple[str, float]] = []
+    with Path(path).open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(
+            (line for line in handle if not line.startswith("#")),
+        )
+        for row in reader:
+            try:
+                h_values.append((row["object"], float(row["h"])))
+            except (KeyError, ValueError) as exc:
+                raise ValueError(
+                    f"each row in {path} must have non-empty 'object' and numeric 'h' columns: {row!r}"
+                ) from exc
+    if not h_values:
+        raise ValueError(f"{path} contains no H values (after header + comments)")
+    return h_values
+
+
+def _depth_prob_from_h(h_value: float, limiting_magnitude_v: float) -> float:
+    """Per-object depth probability derived from absolute magnitude H.
+
+    Stand-in for a full distance + phase-function + albedo model: without a
+    heliocentric distance per synthetic object (angle-only population), H is
+    the only brightness handle available. The detection probability is the
+    FIXED base probability (from the survey limiting magnitude) scaled by a
+    factor that decreases as the object gets fainter than a reference H.
+
+    Reference H = 6.5 (catalog median): objects at the median see the base
+    probability unchanged; fainter objects are penalized; brighter objects
+    are NOT boosted (conservative — no detection advantage beyond the
+    survey's limiting magnitude).
+
+    TODO: replace with apparent-magnitude computation V = H + 5 log10(r * Delta)
+    once the synthetic population carries a heliocentric distance (requires
+    a distance/size/albedo model — see LIMITACOES.md). Until then this is a
+    documented linear stand-in, not a calibrated detection efficiency.
+    """
+    base = 1.0 - 0.15 * (24.5 - limiting_magnitude_v)
+    base = min(1.0, max(0.0, base))
+    # penalty: each magnitude fainter than reference H reduces probability by 0.12
+    penalty = 0.12 * max(0.0, h_value - 6.5)
+    return min(1.0, max(0.0, base - penalty))
     """Uniform-in-angle synthetic ETNO population (Napier et al. 2021 design):
     omega, Omega, mean_anomaly independently uniform in [0, 360) degrees.
     Does NOT touch a_au/e/i_deg - this module tests angular selection bias
     only, not orbit-fitting bias. No REBOUND integration involved.
     """
-    return [
-        {
+def generate_synthetic_population(
+    rng: random.Random,
+    n: int,
+    h_prior_values: list[float] | None = None,
+) -> list[dict]:
+    """Uniform-in-angle synthetic ETNO population (Napier et al. 2021 design):
+    omega, Omega, mean_anomaly independently uniform in [0, 360) degrees.
+    Does NOT touch a_au/e/i_deg - this module tests angular selection bias
+    only, not orbit-fitting bias. No REBOUND integration involved.
+
+    When `h_prior_values` is provided (list of real catalog H values, e.g. from
+    ``data/etnos/h_values.csv``), each synthetic object draws an H value with
+    replacement from that list — so the synthetic population replicates the real
+    sample's brightness distribution while its angles stay uniform-random.
+    When None, the population has no H column and the selection function falls
+    back to the angle-only approximation.
+    """
+    population: list[dict] = []
+    for index in range(n):
+        row = {
             "name": f"synthetic_{index:05d}",
             "omega_deg": rng.uniform(0, 360),
             "Omega_deg": rng.uniform(0, 360),
             "mean_anomaly_deg": rng.uniform(0, 360),
         }
-        for index in range(n)
-    ]
+        if h_prior_values:
+            row["h_value"] = h_prior_values[rng.randrange(len(h_prior_values))]
+        population.append(row)
+    return population
 
 
 def apply_selection_function(
@@ -72,14 +160,14 @@ def apply_selection_function(
     clustering seen in the real catalog could plausibly be a pure detection
     artifact, not for claiming a precise completeness fraction.
 
-    Factor 1 - limiting magnitude (depth): objects are not assigned a
-    physical brightness in this angle-only synthetic population, so this
-    factor is approximated as a FIXED base detection probability derived
-    from limiting_magnitude_v relative to a reference survey depth of V=24.5
-    (representative of DES/OSSOS-class surveys). This is a coarse stand-in
-    -- a full treatment would need a synthetic distance/size/albedo model to
-    compute apparent magnitude per object, which is out of scope for this
-    angle-only bias check (see docs/LIMITACOES.md for this caveat).
+    Factor 1 - limiting magnitude (depth): when the synthetic population
+    carries a per-object ``h_value`` (drawn from the real catalog's H prior),
+    the per-object depth probability is computed by ``_depth_prob_from_h``,
+    which applies a magnitude penalty fainter than the catalog median H=6.5.
+    When ``h_value`` is absent (angle-only mode), this factor is approximated
+    as a FIXED base detection probability derived from limiting_magnitude_v
+    relative to a reference survey depth of V=24.5 (representative of
+    DES/OSSOS-class surveys).
 
     Factor 2 - sky coverage: an object is only detectable if its ARGUMENT
     OF PERIHELION places its (simplified, ecliptic-plane) discovery position
@@ -100,13 +188,18 @@ def apply_selection_function(
     Returns the subset of `population` that "survives" all three factors,
     each evaluated independently as a Bernoulli draw from `rng`.
     """
-    depth_survival_prob = min(1.0, max(0.0, 1.0 - 0.15 * (24.5 - limiting_magnitude_v)))
+    has_h = population and "h_value" in population[0]
+    fixed_depth = min(1.0, max(0.0, 1.0 - 0.15 * (24.5 - limiting_magnitude_v)))
     sky_fraction = min(1.0, max(0.0, sky_coverage_deg2 / 41253.0))
     arc_survival_prob = min(1.0, max(0.0, 1.0 / (1.0 + 0.2 * min_tracking_arc_years)))
 
     survivors: list[dict] = []
     for row in population:
-        if rng.random() > depth_survival_prob:
+        if has_h:
+            depth_prob = _depth_prob_from_h(row["h_value"], limiting_magnitude_v)
+        else:
+            depth_prob = fixed_depth
+        if rng.random() > depth_prob:
             continue
         if rng.random() > sky_fraction:
             continue
@@ -150,7 +243,14 @@ def selection_bias_check(
     real_varpis = real_catalog_varpis(real_etnos)
     n_real = len(real_varpis)
 
-    synthetic = generate_synthetic_population(rng, config.n_synthetic)
+    h_values: list[float] | None = None
+    h_catalog_source: str | None = None
+    if config.bias_model != "none":
+        h_catalog = load_h_catalog(config.h_catalog_path)
+        h_values = [h for _, h in h_catalog]
+        h_catalog_source = config.h_catalog_path
+
+    synthetic = generate_synthetic_population(rng, config.n_synthetic, h_prior_values=h_values)
     surviving = apply_selection_function(
         synthetic, rng, config.limiting_magnitude_v, config.sky_coverage_deg2, config.min_tracking_arc_years
     )
@@ -167,7 +267,23 @@ def selection_bias_check(
     real_r = resultant_length(real_varpis)
     surviving_r = resultant_length(surviving_varpis)
 
+    h_prior_stats: dict[str, float] | None
+    if h_values:
+        sorted_h = sorted(h_values)
+        n = len(sorted_h)
+        median_h = sorted_h[n // 2] if n % 2 else 0.5 * (sorted_h[n // 2 - 1] + sorted_h[n // 2])
+        h_prior_stats = {
+            "h_prior_n": n,
+            "h_prior_mean": round(sum(h_values) / n, 4),
+            "h_prior_median": round(median_h, 4),
+            "h_prior_min": min(h_values),
+            "h_prior_max": max(h_values),
+        }
+    else:
+        h_prior_stats = None
+
     return {
+        "bias_model": config.bias_model,
         "n_real_catalog": n_real,
         "n_synthetic_generated": config.n_synthetic,
         "n_synthetic_surviving": len(surviving),
@@ -175,6 +291,8 @@ def selection_bias_check(
         "real_catalog_resultant_length_R": round(real_r, 6),
         "surviving_synthetic_resultant_length_R": round(surviving_r, 6),
         "real_exceeds_synthetic_R": real_r > surviving_r,
+        "h_prior_source": h_catalog_source,
+        "h_prior_stats": h_prior_stats,
         "interpretation": (
             "O catalogo real tem concentracao angular (R) maior que a populacao "
             "sintetica sujeita ao mesmo modelo de selecao — o clustering real NAO "
@@ -188,8 +306,8 @@ def selection_bias_check(
             "que deve ser reportada explicitamente, nao suavizada."
         ),
         "caveats": [
-            "Modelo angle-only: nao modela magnitude aparente real, geometria de footprint real, nem cadencia real do survey.",
-            "Fatores 1 e 3 sao penalidades uniformes (nao dependem dos angulos do objeto) - apenas o Fator 2 (cobertura de ceu) tem alguma dependencia angular neste modelo simplificado.",
+            "Modelo angle-only (omega, Omega, M): nao modela geometria de footprint real nem cadencia real do survey.",
+            "H-prior from catalog (SBDB): per-object depth probability uses a linear stand-in (H penalty relative to median H=6.5), not calibrated detection efficiency.",
             "Resultado NAO deve ser citado como probabilidade de deteccao calibrada - e um teste de plausibilidade qualitativo.",
         ],
     }

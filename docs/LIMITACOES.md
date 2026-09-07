@@ -74,9 +74,11 @@ mas fora deste lote (sem elementos verificados nesta rodada): 2015 BP519, 2013
 FT28, 2015 GT50 — registrados como próximo lote, não implementados.
 
 - ~~Não há modelo completo de viés observacional.~~ PARCIAL: um modelo de viés
-  de *seleção* observacional simplificado (angle-only, 3 fatores, versão
-  inicial) foi implementado — ver **Atualização 2026-09-03 (ponto 5 do plano
-  pós-auditoria)** imediatamente após esta lista. Um modelo de viés
+  de *seleção* observacional foi implementado em duas versões —
+  **Atualização 2026-09-03** (angle-only, 3 fatores uniformes,
+  `bias_model: none`) e **Atualização 2026-09-07** (`bias_model:
+  h_prior_from_catalog`, fator de profundidade por objeto via magnitudes H
+  do JPL SBDB, catálogo `data/etnos/h_values.csv`). Um modelo de viés
   observacional *completo* continua inexistente.
 - ~~Leave-one-out não é executado.~~ RESOLVIDO: implementado
   (`python main.py leave-one-out --from-run <run> --top N`); as duas runs reais
@@ -118,43 +120,53 @@ contra uma população sintética uniforme submetida a um modelo de seleção de
 fatores (profundidade limitante em V, cobertura de céu, arco mínimo de
 rastreamento — desenho de Napier et al. 2021, arXiv:2102.05601, Seção 3).
 
-**Resultado real (seed 12345, config default):** R_catálogo_real = 0,299836
-vs R_população_sintética_sobrevivente = 0,00593 (essencialmente uniforme) —
-`real_exceeds_synthetic_R: true`. O clustering angular do catálogo real não é
-trivialmente reproduzido por este modelo de viés simplificado.
+**Resultado real (seed 20260903, config h_prior_from_catalog):**
+
+`real_exceeds_synthetic_R: true` — o clustering angular do catálogo real
+não é trivialmente reproduzido por este modelo de viés simplificado, mesmo
+com o fator de profundidade dependente de H.
+
+**Atualização 2026-09-07 — modelo com H-prior do SBDB
+(`bias_model: h_prior_from_catalog`):** o fator de profundidade agora é
+calculado **por objeto** a partir de sua magnitude absoluta H. Cada objeto
+sintético sorteia um H do catálogo empírico `data/etnos/h_values.csv`
+(16 valores do JPL Small-Body Database, consultados 2026-09-07 —
+data/etnos/h_values_attribution.md lista cada valor com ref SBDB). A
+sobrevivência à profundidade usa _depth_prob_from_h(h, V_lim): objetos
+mais fracos que a mediana (H=6.5) são penalizados linearmente (−0,12 por
+magnitude); objetos mais brilhantes NÃO são boostados (conservativo). O
+catálogo abrange de Sedna (H=1,50) a objetos em H~8,5, cobrindo a faixa
+real da amostra. Albedo assumido: 0,10 (Sheppard & Trujillo 2016,
+AJ 152:221) para estimativa de diâmetro — marcado como TODO substituir
+por V = H + 5 log10(r·Delta) quando a população sintética passar a
+carregar distância heliocêntrica.
 
 **Limitações que impedem tratar isto como confirmação forte (reportar
 sempre junto com o resultado acima, nunca isolado):**
 
-- O modelo é *angle-only*: 2 dos 3 fatores (profundidade, arco de
-  rastreamento) são penalidades uniformes que não dependem dos ângulos do
-  objeto — apenas o fator de cobertura de céu tem alguma dependência
-  angular. Isso significa que o modelo, por construção, tem capacidade
-  limitada de *gerar* um clustering artificial mesmo quando esse tipo de
-  viés existe na realidade — logo, o teste é mais fraco do que "descartar
-  viés de seleção" soa à primeira vista; é melhor lido como "este modelo
-  simplificado específico não explica o clustering", não como "não há
-  viés de seleção".
-- Não modela magnitude aparente real, geometria de footprint real (survey
-  pointing), nem cadência real de nenhum survey (DES, OSSOS, etc.) —
-  aproximações documentadas no próprio módulo.
-- O resultado não deve ser citado como probabilidade de detecção
-  calibrada.
-- O blocker de config `no_observational_bias_model`
-  (`configs/science/observational_bias.yaml`, `blocker_if_none: true`)
-  **é desativado automaticamente** quando `selection-bias-check` roda com
-  resultado favorável (`real_exceeds_synthetic_R: true`): `remove_blocker`
-  o retira de `audit/blockers.json` (e da cópia raiz) e o fato é registrado
-  em `events.log`. Com resultado desfavorável (`false`), o blocker antigo
-  é mantido de propósito e o blocker específico
-  `selection_bias_not_ruled_out` é adicionado. Runs que nunca chamam o
-  comando mantêm o blocker antigo.
-- `apply_v2_evidence` agora capa o nível de evidência em `weak` quando
-  `real_exceeds_synthetic_R` é `false` para uma run que rodou o
-  bias-check; quando `true` (como neste resultado), NÃO eleva
-  automaticamente o nível — o teste passar é necessário, não suficiente,
-  para qualquer nível acima de `weak` (os outros gates V2 — leave-one-out,
-  convergência, IAS15, modelos nulos — continuam exigidos).
+- O modelo continua *angle-only*: profundidade e arco de rastreamento são
+  penalidades independentes dos ângulos do objeto — apenas o fator de
+  cobertura de céu tem dependência angular. Capacidade limitada de gerar
+  clustering artificial; o teste é melhor lido como este modelo
+  simplificado específico não explica o clustering, não como não há
+  viés de seleção.
+- O fator de profundidade é um *stand-in* linear (H vs mediana), não uma
+  eficiência de detecção calibrada. Substituição por magnitude aparente
+  real (V = H + 5 log10(r·Delta)) requer distância/tamanho/albedo
+  sintéticos — fora do escopo atual.
+- Não modela geometria de footprint real (survey pointing) nem cadência
+  real (DES, OSSOS, etc.).
+- O resultado não deve ser citado como probabilidade de detecção calibrada.
+- selection-bias-check desativa o blocker antigo
+  
+o_observational_bias_model (locker_if_none: false na config
+  atual) em resultado favorável; em resultado desfavorável adiciona
+  selection_bias_not_ruled_out.
+- pply_v2_evidence capa o nível de evidência em weak quando
+  
+eal_exceeds_synthetic_R: false; quando 	rue, NÃO eleva
+  automaticamente — o teste passar é necessário, não suficiente, para
+  qualquer nível acima de weak.
 
 Próximos passos possíveis (fora do escopo deste lote): modelo de
 seleção dependente de magnitude aparente real (requer distância/tamanho/

@@ -1,4 +1,19 @@
-bias_model: none
-bias_model_level: 0
-blocker_if_none: true
+bias_model: h_prior_from_catalog
+bias_model_level: 1
+blocker_if_none: false
 max_evidence_level_without_bias_model: weak
+# Depth/tracking-arc/sky-coverage factors (Napier et al. 2021 design, arXiv:2102.05601 §3)
+limiting_magnitude_v: 24.5
+sky_coverage_deg2: 20000.0
+min_tracking_arc_years: 2.0
+n_synthetic: 5000
+# H-prior from JPL SBDB (data/etnos/h_values.csv); per-object depth probability
+# uses _depth_prob_from_h() which applies a magnitude penalty fainter than
+# the catalog median H=6.5. Source: NASA/JPL SBDB API, queried 2026-09-07.
+h_catalog_path: data/etnos/h_values.csv
+# Assumed geometric albedo for diameter estimation. Source: Sheppard & Trujillo
+# (2016), AJ 152:221 — moderate albedo used in that paper to estimate ETNO
+# diameters from H in the absence of direct measurement.
+# Published: https://iopscience.iop.org/article/10.3847/1538-3881/152/6/221
+# Preprint: https://arxiv.org/pdf/1608.08772
+albedo_default: 0.10
