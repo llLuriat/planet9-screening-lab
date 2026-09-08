@@ -55,3 +55,24 @@ of per-block footprint geometry.
 - The pipeline uses this curve to evaluate **per-object detection probability**
   at the apparent magnitude V = H + 5 log10(r·Δ), where r and Δ are the
   heliocentric and geocentric distances of each synthetic object.
+
+## OSSOS filling factor (sky-coverage acceptance probability)
+
+The OSSOS survey simulator applies a per-block `filling_factor` as a Monte
+Carlo acceptance probability — the probability that a synthetic TNO's
+sky-plane position falls within the actual survey-pointing footprint
+(Bannister et al. 2016a, survey simulator logic). Since our synthetic
+population is **angle-only** (uniform random on the sphere, no per-object
+sky-plane position to test against real footprint polygons), we apply this
+as a single uniform per-object survival probability.
+
+- **2013A-E block**: filling_factor = 0.9079
+- **2013A-O block**: filling_factor = 0.9055
+- **Arithmetic mean (used here)**: (0.9079 + 0.9055) / 2 = **0.9067**
+
+These values are copied verbatim from the OSSOS SurveySimulator
+`pointings.list` reference file at
+`H:\_tmp_ossos_survey\fortran\F95\pointings.list` (READ-ONLY clone of the
+OSSOS SurveySimulator, commit a1fcf1bfc). See §5.2 of Bannister et al.
+2018, ApJS 236:18 (arXiv:1805.11740) for the footprint description (155 deg²
+covered across 5 pointings of the 2013AE block).

@@ -163,8 +163,15 @@ sempre junto com o resultado acima, nunca isolado):**
 - A curva OSSOS é válida para magnitudes r ~21–25 e taxas no plano do céu
   0,50–8,00 arcsec/hora; fora dessas faixas a eficiência reportada é
   extrapolação.
-- Não modela geometria de footprint real (survey pointing) nem cadência real
-  (DES, OSSOS, etc.).
+- A cobertura de céu usa o **filling factor médio publicado do OSSOS**
+  (0,9067 = média aritmética de 0,9079 [bloco 2013A-E] e 0,9055
+  [bloco 2013A-O], Bannister et al. 2016a) como probabilidade de aceitação
+  posicional uniforme — substitui a aproximação antiga `sky_coverage_deg2/41253`.
+  Como a população sintética é angle-only (sem posição no céu para testar
+  contra os polígonos de footprint reais), **não há filtragem posicional
+  real por bloco**; próximo passo: projeção orbital → posição angular +
+  teste point-in-polygon contra `data/ossos_2013a_blocks.py`.
+- Não modela cadência real (DES, OSSOS, etc.).
 - O resultado não deve ser citado como probabilidade de detecção calibrada.
 - `selection-bias-check` desativa o blocker antigo
   `no_observational_bias_model` (`blocker_if_none: false` na config

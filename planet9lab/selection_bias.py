@@ -48,7 +48,18 @@ class ObservationalBiasConfig(BaseModel):
     )
     ossos_footprint_path: str | None = Field(
         default=None,
-        description="Path to JSON with OSSOS footprint polygons (list of [ra, dec] rings). When None, sky coverage is a uniform fraction.",
+        description="Path to JSON with OSSOS footprint polygons (list of [ra, dec] rings). When None, sky coverage uses ossos_filling_factor as a uniform survival probability.",
+    )
+    # OSSOS filling_factor: per-block Monte Carlo acceptance probability applied
+    # AFTER the point-in-polygon test (Bannister et al. 2016a, survey simulator
+    # logic). Since our synthetic population has no angular position (angle-only),
+    # we use the arithmetic mean of the two 2013A blocks as a single uniform
+    # survival probability: (0.9079 [2013A-E] + 0.9055 [2013A-O]) / 2 = 0.9067.
+    # Source: data/etnos/ossos_efficiency_attribution.md (copied verbatim from
+    # OSSOS SurveySimulator pointings.list, commit a1fcf1bfc).
+    ossos_filling_factor: float = Field(
+        default=0.9067,
+        description="Mean OSSOS filling factor (acceptance probability) across 2013A blocks E and O. Replaces the old sky_coverage_deg2/41253 uniform approximation.",
     )
     q_prior_catalog_path: str = Field(
         default="data/etnos/catalog_validated.csv",
@@ -60,6 +71,13 @@ class ObservationalBiasConfig(BaseModel):
     def _albedo_in_range(cls, value: float) -> float:
         if not (0.01 <= value <= 0.60):
             raise ValueError(f"albedo_default {value} outside plausible TNO range [0.01, 0.60]")
+        return value
+
+    @field_validator("ossos_filling_factor")
+    @classmethod
+    def _filling_factor_in_range(cls, value: float) -> float:
+        if not (0.0 <= value <= 1.0):
+            raise ValueError(f"ossos_filling_factor {value} outside [0, 1]")
         return value
 
 
@@ -286,6 +304,7 @@ def apply_selection_function(
     sky_coverage_deg2: float,
     min_tracking_arc_years: float,
     ossos_efficiency_params: dict | None = None,
+    ossos_filling_factor: float | None = None,
 ) -> list[dict]:
     """Probabilistic detection-selection model (Napier et al. 2021 design,
     arXiv:2102.05601, Section 3): each synthetic object survives with a
@@ -303,11 +322,15 @@ def apply_selection_function(
     Otherwise falls back to ``_depth_prob_from_h`` (H-only stand-in) or
     the fixed base probability when ``h_value`` is absent (angle-only mode).
 
-    Factor 2 - sky coverage: an object is only detectable if its discovery
-    position falls within the surveyed footprint. Approximated here as the
-    fraction sky_coverage_deg2 / 41253 (total sky in deg²) applied as a
-    survival probability per object, uniform over omega_deg (no real
-    footprint geometry - documented simplification).
+    Factor 2 - sky coverage: when ``ossos_filling_factor`` is provided, it
+    is used as the uniform per-object survival probability. This is the
+    OSSOS Monte Carlo acceptance probability (Bannister et al. 2016a, survey
+    simulator logic) applied as a single uniform factor across the synthetic
+    population, since our angle-only population carries no angular position
+    to test against the real OSSOS footprint blocks. The default value is
+    the arithmetic mean of the two 2013A blocks: (0.9079 + 0.9055) / 2 =
+    0.9067. When ``ossos_filling_factor`` is None, falls back to the
+    original uniform sky fraction ``sky_coverage_deg2 / 41253``.
 
     Factor 3 - minimum tracking arc: shorter-period, faster-moving
     configurations are systematically easier to lose before a multi-year
@@ -322,7 +345,10 @@ def apply_selection_function(
     has_distances = population and "r_au" in population[0] and "delta_au" in population[0]
     has_h = population and "h_value" in population[0]
     fixed_depth = min(1.0, max(0.0, 1.0 - 0.15 * (24.5 - limiting_magnitude_v)))
-    sky_fraction = min(1.0, max(0.0, sky_coverage_deg2 / 41253.0))
+    if ossos_filling_factor is not None:
+        sky_survival_prob = ossos_filling_factor
+    else:
+        sky_survival_prob = min(1.0, max(0.0, sky_coverage_deg2 / 41253.0))
     arc_survival_prob = min(1.0, max(0.0, 1.0 / (1.0 + 0.2 * min_tracking_arc_years)))
 
     survivors: list[dict] = []
@@ -340,7 +366,7 @@ def apply_selection_function(
             continue
 
         # Factor 2: sky coverage (uniform fraction for now).
-        if rng.random() > sky_fraction:
+        if rng.random() > sky_survival_prob:
             continue
 
         # Factor 3: tracking arc.
@@ -458,7 +484,8 @@ def selection_bias_check(
         ),
         "caveats": [
             "Modelo angle-only (omega, Omega, M): nao modela geometria de footprint real nem cadencia real do survey.",
-            "H-prior from catalog (SBDB): per-object depth probability uses a linear stand-in (H penalty relative to median H=6.5), not calibrated detection efficiency.",
+            "Depth efficiency: OSSOS quadratic-logistic curve (Bannister et al. 2018, ApJS 236:18) evaluated at V = H + 5 log10(r·Delta) per-object, when distances are available; H-only linear stand-in otherwise.",
+            "Sky coverage: OSSOS filling factor (mean 0.9067 across 2013A-E and 2013A-O blocks, Bannister et al. 2016a) applied as uniform per-object survival probability (angle-only population has no sky-plane position).",
             "Resultado NAO deve ser citado como probabilidade de deteccao calibrada - e um teste de plausibilidade qualitativo.",
         ],
     }

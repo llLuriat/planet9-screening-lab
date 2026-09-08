@@ -216,7 +216,7 @@ def test_selection_bias_check_returns_all_required_keys():
     } <= set(result)
     assert result["n_real_catalog"] == 16
     assert result["n_synthetic_generated"] == config.n_synthetic
-    assert len(result["caveats"]) == 3
+    assert len(result["caveats"]) >= 4
 
 
 def test_selection_bias_check_is_deterministic_for_fixed_seed():
