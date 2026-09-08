@@ -359,3 +359,15 @@ Executor deve:
   (c) avançar para Tarefa B.
 
 
+### 2026-09-07 22:45Z Cline (Executor) — Filling factor OSSOS como substituto de sky_coverage
+- Status: concluído (bugfix sobre a implementação do commit 7d5afb2)
+- O que foi feito / resultado real:
+  - **`planet9lab/selection_bias.py:368-369`**: corrigido `NameError` — a variável `sky_survival_prob` (definida na linha 349-351 com `ossos_filling_factor` ou fallback `sky_coverage_deg2/41253.0`) não estava sendo usada no teste Bernoulli; o código referenciava `sky_fraction` (nome inexistente). Substituído por `sky_survival_prob`.
+  - **`caveats` expandido de 3 para 4**: adicionada entrada documentando o filling factor OSSOS (0,9067) como aproximação uniforme (angle-only, sem POS real para teste point-in-polygon).
+  - **`docs/LIMITACOES.md`**: atualizada para refletir que a cobertura de céu agora usa o filling factor médio publicado do OSSOS (0,9067) em vez da aproximação `sky_coverage_deg2/41253`, mantendo documentada a limitação de não ter filtragem posicional real por bloco.
+  - **`data/etnos/ossos_efficiency_attribution.md`**: seção "OSSOS filling factor" adicionada com valores (0,9079 [2013A-E], 0,9055 [2013A-O], média 0,9067) e atribuição a Bannister et al. 2016a / OSSOS SurveySimulator.
+  - **`tests/test_selection_bias.py:219`**: ajustada asserção `len(result["caveats"]) == 3` → `>= 4` (o teste valida que os 4 caveats existem; futuros caveats não quebram o contrato).
+- Commit: `9956415` (4 files changed, 67 insertions, 12 deletions; push para origin/main).
+- Próximo passo: Auditor decide — (a) integrar footprint real dos blocos OSSOS como filtro posicional (requer projeção orbital → posição angular no céu), (b) executar `selection-bias-check` em runs reais com a nova config, ou (c) avançar para Tarefa B.
+
+
