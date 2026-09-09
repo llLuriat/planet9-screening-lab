@@ -547,6 +547,17 @@ def selection_bias_check(
     else:
         h_prior_stats = None
 
+    # O caveat de sky coverage deve reportar o valor EFETIVO de
+    # ossos_filling_factor usado nesta execução (Auditor 2026-09-09: não citar
+    # o default 0.9067 hardcoded quando a config usa outro valor). O 0.9067
+    # segue no texto como proveniência do default (Bannister et al. 2016a).
+    effective_filling_factor = (
+        config.ossos_filling_factor
+        if config.ossos_filling_factor is not None
+        else config.sky_coverage_deg2 / 41253.0
+    )
+    ff_txt = f"{effective_filling_factor:.4f}"
+
     return {
         "bias_model": config.bias_model,
         "ossos_footprint_mode": (
@@ -585,9 +596,9 @@ def selection_bias_check(
             "Depth efficiency: OSSOS quadratic-logistic curve (Bannister et al. 2018, ApJS 236:18) evaluated at V = H + 5 log10(r·Delta) per-object, when distances are available; H-only linear stand-in otherwise.",
             "Sky coverage: "
             + (
-                "real point-in-polygon test against OSSOS 2013A footprint blocks; ossos_filling_factor (mean 0.9067, Bannister et al. 2016a) applied as per-block MC acceptance."
+                f"real point-in-polygon test against OSSOS 2013A footprint blocks; ossos_filling_factor={ff_txt} applied as per-block MC acceptance (0.9067 = mean of 2013A-E/2013A-O, the default this config may override; Bannister et al. 2016a)."
                 if ossos_footprint_blocks is not None
-                else "OSSOS filling factor (mean 0.9067 across 2013A-E and 2013A-O blocks, Bannister et al. 2016a) applied as uniform per-object survival probability (angle-only population has no sky-plane position)."
+                else f"OSSOS filling factor {ff_txt} applied as uniform per-object survival probability (0.9067 = mean across 2013A-E and 2013A-O blocks, the default this config may override; Bannister et al. 2016a; angle-only population has no sky-plane position)."
             ),
             "Resultado NAO deve ser citado como probabilidade de deteccao calibrada - e um teste de plausibilidade qualitativo.",
         ],

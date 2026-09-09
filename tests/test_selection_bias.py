@@ -514,6 +514,31 @@ def test_selection_bias_check_default_reports_uniform_filling_mode():
     assert result["ossos_footprint_mode"] == "uniform_filling_factor"
 
 
+def test_sky_coverage_caveat_reports_configured_filling_factor():
+    """Auditor (2026-09-09, fechamento Tarefa D): o caveat de sky coverage deve
+    reportar o valor EFETIVO de ossos_filling_factor usado na execução — não o
+    default 0.9067 hardcoded (imprecisão registrada no Log do Item 1). O
+    0.9067 permanece no texto apenas como proveniência do default."""
+    from planet9lab.loaders import load_etnos
+
+    etnos = load_etnos(REAL_ETNO_CATALOG)
+    config = load_bias_config("configs/science/observational_bias.yaml")
+
+    # Config com valor não-default: o número aplicado deve aparecer no caveat.
+    configured = config.model_copy(update={"ossos_filling_factor": 0.4848})
+    result = selection_bias_check(etnos, configured, seed=12345)
+    sky = [c for c in result["caveats"] if c.startswith("Sky coverage")]
+    assert len(sky) == 1
+    assert "0.4848" in sky[0]
+    assert "mean 0.9067" not in sky[0]  # padrão antigo (hardcoded) não pode voltar
+    assert "0.9067" in sky[0]  # proveniência do default segue atribuída
+
+    # Config default: o valor aplicado É o default documentado.
+    result_default = selection_bias_check(etnos, config, seed=12345)
+    sky_default = [c for c in result_default["caveats"] if c.startswith("Sky coverage")]
+    assert "0.9067 applied as uniform" in sky_default[0]
+
+
 def test_selection_bias_check_with_footprint_enabled_reports_real_mode():
     """Opting in (use_ossos_footprint: true) loads the real OSSOS 2013A
     blocks dynamically and reports the real-footprint mode. The sky-coverage
