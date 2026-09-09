@@ -148,6 +148,25 @@ população sintética agora carrega distâncias heliocêntrica (r) e geocêntri
 elementos orbitais simulados. O albedo permanece fixo em 0,10 (Sheppard &
 Trujillo 2016).
 
+**Atualização 2026-09-08 — footprint geométrico real do OSSOS como filtro
+posicional (opt-in via `use_ossos_footprint: true`):** o fator de cobertura
+de céu agora suporta o teste point-in-polygon real contra os polígonos dos
+blocos 2013A-E/2013A-O do OSSOS (`planet9lab/data/ossos_2013a_blocks.py`,
+geometria extraída do OSSOS SurveySimulator; Bannister et al. 2018,
+ApJS 236:18, Fig. 1), usando o porte fiel de `create_poly`/`point_in_polygon`
+(`planet9lab/geometry/poly_footprint.py`, do Fortran `poly_lib.f95`).
+Com o footprint ativo, objetos fora de todos os blocos são rejeitados
+geometricamente (convenção do Fortran: retorno `!= 0` = dentro ou na borda,
+idêntica à lógica `in_poly > 0` do SurveySimulator) e os sobreviventes ainda
+passam pelo acceptance de Monte Carlo `ossos_filling_factor` (0,9067),
+replicando a lógica do SurveySimulator; o resultado reporta
+`ossos_footprint_mode: real_footprint_polygons`. O padrão permanece
+DESLIGADO (`use_ossos_footprint: false`) porque as posições
+(`ra_deg`, `dec_deg`) da população sintética são proxies uniformes
+aleatórios — não uma projeção orbital→céu real — e o footprint 2013A cobre
+~0,07% da esfera celeste: ativá-lo por padrão colapsaria a amostra sintética
+sobrevivente a um punhado de objetos e tornaria a comparação de R degenerada.
+
 **Limitações que impedem tratar isto como confirmação forte (reportar
 sempre junto com o resultado acima, nunca isolado):**
 
@@ -167,10 +186,27 @@ sempre junto com o resultado acima, nunca isolado):**
   (0,9067 = média aritmética de 0,9079 [bloco 2013A-E] e 0,9055
   [bloco 2013A-O], Bannister et al. 2016a) como probabilidade de aceitação
   posicional uniforme — substitui a aproximação antiga `sky_coverage_deg2/41253`.
-  Como a população sintética é angle-only (sem posição no céu para testar
-  contra os polígonos de footprint reais), **não há filtragem posicional
-  real por bloco**; próximo passo: projeção orbital → posição angular +
-  teste point-in-polygon contra `data/ossos_2013a_blocks.py`.
+  **Correção de cabeamento declarada em 2026-09-08:** até o commit 9956415,
+  o ponto de entrada `selection_bias_check` NÃO passava
+  `ossos_filling_factor` para `apply_selection_function`, então as execuções
+  reais de `selection-bias-check` usavam na prática o fallback antigo
+  `sky_coverage_deg2/41253` (≈0,485 com `sky_coverage_deg2: 20000`), e não o
+  0,9067 aqui documentado. Com o cabeamento corrigido, runs futuros usam
+  0,9067; resultados de `selection-bias-check` produzidos antes desta
+  correção não são diretamente comparáveis aos posteriores (a amostra
+  sintética sobrevivente muda).
+- A população sintética carrega posição no céu (`ra_deg`/`dec_deg`) apenas
+  como **proxy uniforme aleatório** — NÃO é uma projeção orbital→céu real
+  (isso exigiria resolver a equação de Kepler + matrizes de rotação para uma
+  época). Além disso o sorteio é uniforme em declinação, não isotrópico em
+  área (isotrópico seria `sin(dec)` uniforme) — irrelevante enquanto proxy
+  declarado, relevante se o footprint algum dia virar padrão. Por isso o
+  filtro posicional real por bloco é **opt-in** (`use_ossos_footprint: true`;
+  ver Atualização 2026-09-08 acima) e o modo padrão continua sem filtragem
+  posicional. O modo com footprint é geometricamente real, mas
+  astrofisicamente não informativo enquanto a posição for proxy uniforme:
+  ele exercita a geometria do footprint, não mede clustering induzido por
+  viés. Próximo passo: projeção orbital → posição angular verdadeira.
 - Não modela cadência real (DES, OSSOS, etc.).
 - O resultado não deve ser citado como probabilidade de detecção calibrada.
 - `selection-bias-check` desativa o blocker antigo
@@ -184,7 +220,10 @@ sempre junto com o resultado acima, nunca isolado):**
 
 Próximos passos possíveis (fora do escopo deste lote): modelo de
 seleção dependente de magnitude aparente real com função de fase
-(requer ângulo de fase α sintético) e footprint geométrico real de survey.
+(requer ângulo de fase α sintético) e projeção orbital→céu verdadeira para
+tornar o filtro de footprint geométrico real (já implementado como opt-in,
+ver Atualização 2026-09-08) astrofisicamente informativo em vez de apenas
+geométrico.
 
 ## Atualização V2 (item 2 do plano V1->V2: Monte Carlo / QMC)
 

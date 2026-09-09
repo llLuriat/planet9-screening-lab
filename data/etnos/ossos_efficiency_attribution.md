@@ -76,3 +76,43 @@ These values are copied verbatim from the OSSOS SurveySimulator
 OSSOS SurveySimulator, commit a1fcf1bfc). See §5.2 of Bannister et al.
 2018, ApJS 236:18 (arXiv:1805.11740) for the footprint description (155 deg²
 covered across 5 pointings of the 2013AE block).
+## OSSOS 2013A footprint block geometry (point-in-polygon positional filter)
+
+As of the footprint integration, the **real OSSOS 2013A sky-block geometry**
+is available as a positional filter in `apply_selection_function`:
+
+- Geometry source: `planet9lab/data/ossos_2013a_blocks.py` (blocks
+  `2013A-E` and `2013A-O`), extracted from the OSSOS SurveySimulator
+  `pointings.list` / `.eff` files (Bannister et al. 2018, ApJS 236:18,
+  Fig. 1; read-only reference clone at `H:\_tmp_ossos_survey`, commit
+  a1fcf1bfc146b7b72654d65d6789c59790e3cbb4).
+- Filter implementation: `_sky_position_in_footprint()` in
+  `planet9lab/selection_bias.py` uses `create_poly` + `point_in_polygon`
+  from `planet9lab/geometry/poly_footprint.py` (faithful port of the
+  OSSOS SurveySimulator Fortran `poly_lib.f95`), reconstructing each
+  block's polygon from `center_ra_deg` / `center_dec_deg` /
+  `corner_offsets_deg` and testing the synthetic object's `(ra_deg,
+  dec_deg)` in degrees (converted to radians at the call site, per the
+  radians convention documented in `poly_footprint.py`).
+
+### Activation (explicit opt-in)
+
+The filter is **opt-in** via `use_ossos_footprint: true` in
+`configs/science/observational_bias.yaml` (default `false`). It is OFF by
+default on purpose: the synthetic population's sky positions are
+uniform-random RA/Dec proxies — not a full orbital→sky projection — and
+the OSSOS 2013A footprint covers only ~0.07% of the celestial sphere, so
+auto-enabling it would collapse the surviving synthetic sample to a
+handful of objects and make the R comparison degenerate. See
+`docs/LIMITACOES.md` for the full limitation statement.
+
+### Behavior when enabled
+
+1. Objects outside every OSSOS block polygon are rejected outright
+   (real point-in-polygon test).
+2. Survivors then pass the per-block Monte Carlo acceptance
+   `ossos_filling_factor` (0.9067 mean of 2013A-E/2013A-O) applied as a
+   per-object survival probability, matching the SurveySimulator logic.
+3. `selection_bias_check` reports `ossos_footprint_mode`:
+   `"real_footprint_polygons"` when enabled, `"uniform_filling_factor"`
+   otherwise.

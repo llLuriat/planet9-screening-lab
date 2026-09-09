@@ -242,6 +242,12 @@ UNFAVORABLE_BIAS_CONFIG_YAML = (
     "blocker_if_none: true\n"
     "limiting_magnitude_v: 22.0\n"
     "sky_coverage_deg2: 5000.0\n"
+    # Since selection_bias_check now wires ossos_filling_factor from config
+    # (it takes precedence over sky_coverage_deg2 in apply_selection_function,
+    # completing the 9956415 fix), the restrictive scenario must set it
+    # explicitly. 0.12 reproduces the order-of-magnitude restrictiveness the
+    # test originally got from sky_coverage_deg2=5000/41253 ~= 0.121.
+    "ossos_filling_factor: 0.12\n"
     "min_tracking_arc_years: 10.0\n"
     "n_synthetic: 200\n"
 )
@@ -418,3 +424,108 @@ def test_selection_bias_check_with_h_prior_reports_h_prior_stats(tmp_path):
     assert stats["h_prior_min"] <= 2.0
     assert stats["h_prior_max"] >= 7.0
 
+def test_sky_position_in_footprint_true_for_block_center():
+    """The real OSSOS 2013A block centers must be inside their polygons."""
+    from planet9lab.data.ossos_2013a_blocks import OSSOS_2013A_BLOCKS
+    from planet9lab.selection_bias import _sky_position_in_footprint
+
+    blocks = [dict(block) for block in OSSOS_2013A_BLOCKS.values()]
+    for block in blocks:
+        ra = block["center_ra_deg"]
+        dec = block["center_dec_deg"]
+        assert _sky_position_in_footprint(ra, dec, blocks) is True
+
+
+def test_sky_position_in_footprint_false_for_far_position():
+    """A position far from both 2013A blocks must be outside the footprint."""
+    from planet9lab.data.ossos_2013a_blocks import OSSOS_2013A_BLOCKS
+    from planet9lab.selection_bias import _sky_position_in_footprint
+
+    blocks = [dict(block) for block in OSSOS_2013A_BLOCKS.values()]
+    # RA = 0, Dec = -89 is on the opposite side of the sky from the
+    # equatorial OSSOS 2013A blocks at RA ~ 214/240, Dec ~ -12.
+    assert _sky_position_in_footprint(0.0, -89.0, blocks) is False
+    assert _sky_position_in_footprint(0.0, 0.0, blocks) is False
+
+
+def test_apply_selection_function_footprint_rejects_outside_objects():
+    """With ossos_footprint_blocks provided and sky positions present, only
+    objects inside a footprint block survive the sky-coverage factor (a
+    permissive filling factor of 1.0 isolates the geometric filter)."""
+    from planet9lab.data.ossos_2013a_blocks import OSSOS_2013A_BLOCKS
+    from planet9lab.selection_bias import apply_selection_function
+
+    blocks = [dict(block) for block in OSSOS_2013A_BLOCKS.values()]
+    # Hand-built population: one object inside the first block's center,
+    # one far outside. No h_value/r_au/delta_au -> fixed depth prob = 1.0
+    # at limiting_magnitude_v=24.5, so only the footprint factor decides.
+    inside_ra = blocks[0]["center_ra_deg"]
+    inside_dec = blocks[0]["center_dec_deg"]
+    population = [
+        {"name": "inside", "omega_deg": 0.0, "Omega_deg": 0.0,
+         "mean_anomaly_deg": 0.0, "i_deg": 0.0,
+         "ra_deg": inside_ra, "dec_deg": inside_dec},
+        {"name": "outside", "omega_deg": 0.0, "Omega_deg": 0.0,
+         "mean_anomaly_deg": 0.0, "i_deg": 0.0,
+         "ra_deg": 0.0, "dec_deg": -89.0},
+    ]
+    survivors = apply_selection_function(
+        population,
+        rng=random.Random(42),
+        limiting_magnitude_v=24.5,
+        sky_coverage_deg2=20000.0,
+        min_tracking_arc_years=0.0,
+        ossos_filling_factor=1.0,  # permissive: isolate the geometry filter
+        ossos_footprint_blocks=blocks,
+    )
+    names = {row["name"] for row in survivors}
+    assert "inside" in names
+    assert "outside" not in names
+
+
+def test_apply_selection_function_without_footprint_keeps_uniform_behavior():
+    """Backward compatibility: with ossos_footprint_blocks None and no sky
+    positions, the (angle-only) population uses the uniform filling-factor
+    survival probability as before the footprint integration."""
+    population = generate_synthetic_population(random.Random(7), n=200)
+    survivors = apply_selection_function(
+        population,
+        rng=random.Random(99),
+        limiting_magnitude_v=24.0,
+        sky_coverage_deg2=15000.0,
+        min_tracking_arc_years=2.0,
+        ossos_filling_factor=0.9067,
+        ossos_footprint_blocks=None,
+    )
+    assert 0 < len(survivors) <= len(population)
+
+
+def test_selection_bias_check_default_reports_uniform_filling_mode():
+    """The default config (use_ossos_footprint: false) must keep the uniform
+    filling-factor sky model: the footprint is opt-in because the synthetic
+    RA/Dec are uniform-random proxies, not orbital projections, and the OSSOS
+    2013A footprint covers only ~0.07% of the sky."""
+    from planet9lab.loaders import load_etnos
+
+    etnos = load_etnos(REAL_ETNO_CATALOG)
+    config = load_bias_config("configs/science/observational_bias.yaml")
+    assert config.use_ossos_footprint is False
+    result = selection_bias_check(etnos, config, seed=12345)
+    assert result["ossos_footprint_mode"] == "uniform_filling_factor"
+
+
+def test_selection_bias_check_with_footprint_enabled_reports_real_mode():
+    """Opting in (use_ossos_footprint: true) loads the real OSSOS 2013A
+    blocks dynamically and reports the real-footprint mode. The sky-coverage
+    caveat must then mention the real point-in-polygon test."""
+    from planet9lab.selection_bias import ObservationalBiasConfig
+
+    etnos = load_etnos(REAL_ETNO_CATALOG)
+    config = ObservationalBiasConfig(
+        bias_model="h_prior_from_catalog",
+        use_ossos_footprint=True,
+        n_synthetic=200,
+    )
+    result = selection_bias_check(etnos, config, seed=12345)
+    assert result["ossos_footprint_mode"] == "real_footprint_polygons"
+    assert any("point-in-polygon" in c for c in result["caveats"])

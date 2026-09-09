@@ -61,6 +61,14 @@ class ObservationalBiasConfig(BaseModel):
         default=0.9067,
         description="Mean OSSOS filling factor (acceptance probability) across 2013A blocks E and O. Replaces the old sky_coverage_deg2/41253 uniform approximation.",
     )
+    ossos_footprint_blocks: list[dict] | None = Field(
+        default=None,
+        description="List of OSSOS footprint block dicts (from planet9lab/data/ossos_2013a_blocks.py) for real point-in-polygon sky filtering. When None, falls back to ossos_filling_factor as uniform survival probability.",
+    )
+    use_ossos_footprint: bool = Field(
+        default=False,
+        description="When true, selection_bias_check loads the real OSSOS 2013A footprint blocks (planet9lab/data/ossos_2013a_blocks.py, Bannister et al. 2018 Fig. 1) and applies them as a positional point-in-polygon filter, replacing the uniform filling-factor-only sky model. Default false on purpose: the synthetic population's sky positions (ra_deg/dec_deg) are uniform-random proxies, not orbital-to-sky projections, and the OSSOS 2013A footprint covers only ~0.07% of the celestial sphere, so auto-enabling it would collapse the surviving synthetic sample and change the interpretation of every default run without that being declared.",
+    )
     q_prior_catalog_path: str = Field(
         default="data/etnos/catalog_validated.csv",
         description="Path to the real ETNO catalog used to build the perihelion distance q prior.",
@@ -236,11 +244,51 @@ def _apparent_magnitude(h_value: float, r_au: float, delta_au: float) -> float:
     the synthetic population carries a phase angle α. See LIMITACOES.md.
     """
     return h_value + 5.0 * math.log10(max(r_au * delta_au, 1e-6))
+
+
+def _sky_position_in_footprint(
+    ra_deg: float,
+    dec_deg: float,
+    blocks: list[dict],
+) -> bool:
+    """True if (ra_deg, dec_deg) falls inside any OSSOS footprint block.
+
+    Uses the real polygon geometry from ``planet9lab/data/ossos_2013a_blocks.py``
+    and the point-in-polygon test from ``planet9lab/geometry/poly_footprint.py``
+    (ported from the OSSOS SurveySimulator Fortran ``poly_lib.f95``). The
+    polygon vertices are reconstructed from ``create_poly`` using each block's
+    ``center_ra_deg``, ``center_dec_deg``, and ``corner_offsets_deg`` (converted
+    to radians), per the OSSOS SurveySimulator parsing logic.
+
+    Args:
+        ra_deg, dec_deg : sky-plane position in DEGREES.
+        blocks : list of block dicts (each from ``OSSOS_2013A_BLOCKS``).
+
+    Returns:
+        True if the position is inside at least one block polygon.
+    """
+    from .geometry.poly_footprint import create_poly, point_in_polygon
+
+    ra_rad = math.radians(ra_deg)
+    dec_rad = math.radians(dec_deg)
+    for block in blocks:
+        ra_center_rad = math.radians(block["center_ra_deg"])
+        dec_center_rad = math.radians(block["center_dec_deg"])
+        offsets_rad = [
+            (math.radians(x), math.radians(y))
+            for x, y in block["corner_offsets_deg"]
+        ]
+        poly = create_poly(ra_center_rad, dec_center_rad, offsets_rad)
+        # point_in_polygon returns n (inside), 1 (on edge) or 0 (outside).
+        if point_in_polygon((ra_rad, dec_rad), poly) != 0:
+            return True
+    return False
 def generate_synthetic_population(
     rng: random.Random,
     n: int,
     h_prior_values: list[float] | None = None,
     q_prior_values: list[float] | None = None,
+    generate_sky_position: bool = False,
 ) -> list[dict]:
     """Uniform-in-angle synthetic ETNO population (Napier et al. 2021 design):
     omega, Omega, mean_anomaly independently uniform in [0, 360) degrees.
@@ -265,6 +313,14 @@ def generate_synthetic_population(
     sample's brightness distribution while its angles stay uniform-random.
     When None, the population has no H column and the selection function falls
     back to the angle-only approximation.
+
+    When `generate_sky_position` is True, each object also carries a uniform-random
+    sky-plane position (``ra_deg``, ``dec_deg``) on the celestial sphere, used for
+    point-in-polygon footprint filtering. This is NOT a real orbital-to-sky
+    projection (which would require solving Kepler's equation + rotation matrices
+    for a full sky position at a given epoch); uniform-random is sufficient for the
+    footprint test. Generated only when requested to preserve RNG determinism for
+    callers that don't need footprint filtering.
     """
     population: list[dict] = []
     for index in range(n):
@@ -291,6 +347,11 @@ def generate_synthetic_population(
             "r_au": max(r_au, 10.0),
             "delta_au": max(delta_au, 1.0),
         }
+        if generate_sky_position:
+            # Uniform-random RA/Dec on the celestial sphere, sufficient for the
+            # point-in-polygon footprint test (see docstring).
+            row["ra_deg"] = normalize_degrees(rng.uniform(0, 360))
+            row["dec_deg"] = rng.uniform(-90, 90)
         if h_prior_values:
             row["h_value"] = h_prior_values[rng.randrange(len(h_prior_values))]
         population.append(row)
@@ -305,6 +366,7 @@ def apply_selection_function(
     min_tracking_arc_years: float,
     ossos_efficiency_params: dict | None = None,
     ossos_filling_factor: float | None = None,
+    ossos_footprint_blocks: list[dict] | None = None,
 ) -> list[dict]:
     """Probabilistic detection-selection model (Napier et al. 2021 design,
     arXiv:2102.05601, Section 3): each synthetic object survives with a
@@ -345,6 +407,8 @@ def apply_selection_function(
     has_distances = population and "r_au" in population[0] and "delta_au" in population[0]
     has_h = population and "h_value" in population[0]
     fixed_depth = min(1.0, max(0.0, 1.0 - 0.15 * (24.5 - limiting_magnitude_v)))
+    has_sky_position = population and "ra_deg" in population[0] and "dec_deg" in population[0]
+    has_footprint = ossos_footprint_blocks is not None and has_sky_position
     if ossos_filling_factor is not None:
         sky_survival_prob = ossos_filling_factor
     else:
@@ -365,9 +429,17 @@ def apply_selection_function(
         if rng.random() > depth_prob:
             continue
 
-        # Factor 2: sky coverage (uniform fraction for now).
-        if rng.random() > sky_survival_prob:
-            continue
+        # Factor 2: sky coverage.
+        if has_footprint:
+            # Real footprint: reject objects outside all OSSOS blocks,
+            # then apply filling_factor as the per-block MC acceptance.
+            if not _sky_position_in_footprint(row["ra_deg"], row["dec_deg"], ossos_footprint_blocks):
+                continue
+            if rng.random() > sky_survival_prob:
+                continue
+        else:
+            if rng.random() > sky_survival_prob:
+                continue
 
         # Factor 3: tracking arc.
         if rng.random() > arc_survival_prob:
@@ -419,9 +491,23 @@ def selection_bias_check(
         h_values = [h for _, h in h_catalog]
         h_catalog_source = config.h_catalog_path
         q_prior_values = _load_q_prior(config.q_prior_catalog_path)
+        if config.ossos_footprint_blocks is not None:
+            ossos_footprint_blocks = config.ossos_footprint_blocks
+        elif config.use_ossos_footprint:
+            from .data.ossos_2013a_blocks import OSSOS_2013A_BLOCKS
+
+            ossos_footprint_blocks = [dict(block) for block in OSSOS_2013A_BLOCKS.values()]
+        else:
+            ossos_footprint_blocks = None
+    else:
+        ossos_footprint_blocks = None
 
     synthetic = generate_synthetic_population(
-        rng, config.n_synthetic, h_prior_values=h_values, q_prior_values=q_prior_values
+        rng,
+        config.n_synthetic,
+        h_prior_values=h_values,
+        q_prior_values=q_prior_values,
+        generate_sky_position=ossos_footprint_blocks is not None,
     )
     surviving = apply_selection_function(
         synthetic,
@@ -430,6 +516,8 @@ def selection_bias_check(
         config.sky_coverage_deg2,
         config.min_tracking_arc_years,
         ossos_efficiency_params=config.ossos_efficiency_params,
+        ossos_filling_factor=config.ossos_filling_factor,
+        ossos_footprint_blocks=ossos_footprint_blocks,
     )
 
     def resultant_length(angles_deg: list[float]) -> float:
@@ -461,6 +549,11 @@ def selection_bias_check(
 
     return {
         "bias_model": config.bias_model,
+        "ossos_footprint_mode": (
+            "real_footprint_polygons"
+            if ossos_footprint_blocks is not None
+            else "uniform_filling_factor"
+        ),
         "n_real_catalog": n_real,
         "n_synthetic_generated": config.n_synthetic,
         "n_synthetic_surviving": len(surviving),
@@ -483,9 +576,19 @@ def selection_bias_check(
             "que deve ser reportada explicitamente, nao suavizada."
         ),
         "caveats": [
-            "Modelo angle-only (omega, Omega, M): nao modela geometria de footprint real nem cadencia real do survey.",
+            "Modelo angle-only (omega, Omega, M): "
+            + (
+                "real OSSOS 2013A footprint polygons (data/ossos_2013a_blocks.py, Bannister et al. 2018 Fig. 1) are used as a positional filter; the sky-plane position is a uniform-random RA/Dec proxy (ra_deg/dec_deg), not a full orbital-to-sky projection."
+                if ossos_footprint_blocks is not None
+                else "nao modela geometria de footprint real nem cadencia real do survey."
+            ),
             "Depth efficiency: OSSOS quadratic-logistic curve (Bannister et al. 2018, ApJS 236:18) evaluated at V = H + 5 log10(r·Delta) per-object, when distances are available; H-only linear stand-in otherwise.",
-            "Sky coverage: OSSOS filling factor (mean 0.9067 across 2013A-E and 2013A-O blocks, Bannister et al. 2016a) applied as uniform per-object survival probability (angle-only population has no sky-plane position).",
+            "Sky coverage: "
+            + (
+                "real point-in-polygon test against OSSOS 2013A footprint blocks; ossos_filling_factor (mean 0.9067, Bannister et al. 2016a) applied as per-block MC acceptance."
+                if ossos_footprint_blocks is not None
+                else "OSSOS filling factor (mean 0.9067 across 2013A-E and 2013A-O blocks, Bannister et al. 2016a) applied as uniform per-object survival probability (angle-only population has no sky-plane position)."
+            ),
             "Resultado NAO deve ser citado como probabilidade de deteccao calibrada - e um teste de plausibilidade qualitativo.",
         ],
     }

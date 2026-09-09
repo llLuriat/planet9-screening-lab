@@ -30,3 +30,21 @@ ossos_efficiency_params:
   c: 0.0276305359
   m0: 24.1423416
   sig: 0.153656587
+
+# OSSOS footprint blocks for real point-in-polygon sky filtering.
+# When enabled, apply_selection_function checks each synthetic object's
+# (ra_deg, dec_deg) against the real OSSOS 2013A footprint polygons
+# (Bannister et al. 2018, Fig. 1).
+#
+# use_ossos_footprint: false is the DEFAULT ON PURPOSE. The OSSOS 2013A
+# footprint covers only ~0.07% of the celestial sphere, and the synthetic
+# population's sky positions (ra_deg/dec_deg) are uniform-random proxies,
+# NOT orbital-to-sky projections. Auto-enabling this filter would collapse
+# the surviving synthetic sample to a handful of objects, making the
+# resulting R comparison degenerate and silently changing the
+# interpretation of default runs. Enable it explicitly only when the
+# synthetic population carries a true orbital->sky projection (current
+# TODO, see docs/LIMITACOES.md) or when you specifically want to exercise
+# the real-footprint geometry path.
+use_ossos_footprint: false
+ossos_footprint_blocks: null
