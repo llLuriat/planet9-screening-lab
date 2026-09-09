@@ -280,6 +280,19 @@ Executor deve:
 4. A Tarefa B pode apoiar-se em `planet9lab/geometry/poly_footprint.py`
    como base (footprint geométrico real disponível).
 
+### B2 — Atualização do artigo: informação pronta, aguardando decisão do Auditor (informativo, não bloqueia execução)
+A run `screen_20260903T211311606520Z` passou por execução OFICIAL do
+`selection-bias-check` com a config canônica corrigida (filling factor
+0,9067 — ver Log 2026-09-09), que substitui o artefato antigo (fallback
+≈0,485) como referência válida do projeto. A conclusão
+(`real_exceeds_synthetic_R: true`) se mantém — nenhum texto científico
+existente fica invalidado. SE o Auditor julgar necessário citar no artigo
+os números novos (R sintético 0,032567 vs 0,00593 do artefato antigo,
+sobrevivência 0,1918 vs 0,3484), a atualização do
+`docs/PLANET9_ARTIGO_v1.2_ABNT.docx` está PRONTA para preparação, mas
+EXIGE autorização explícita e separada (nenhum .docx foi tocado).
+Backup do artefato antigo: `%TEMP%\p9_bias_recheck\selection_bias_OFFICIAL_PRE_20260909.json`.
+
 
 ---
 
@@ -481,7 +494,7 @@ Executor deve:
 - Commit: docs (esta entrada + Tarefa D adicionada ao "Plano vigente" por instrução explícita do Auditor).
 - Próximo passo: Item 2 — Tarefa D (dashboard NiceGUI) em modo autônomo, começando pela adição da dependência `nicegui` + gate imediato (`pytest -q` + `ruff check .`) antes de qualquer código novo.
 
-### 2026-09-09 00:45Z Cline (Executor) — Item 2 / Tarefa D: dashboard de controle e visualização de runs (NiceGUI, modo autônomo)
+### 2026-09-09 03:45Z Cline (Executor) — Item 2 / Tarefa D: dashboard de controle e visualização de runs (NiceGUI, modo autônomo)
 - Status: concluído (critério de aceite atendido; nenhuma das duas condições de interrupção do modo autônomo ocorreu).
 - Sequência seguida (conforme ordem recomendada do plano): dependência `nicegui` adicionada ao `pyproject.toml` e gate rodado IMEDIATAMENTE antes de qualquer código novo — sem conflito de dependência (instalação limpa no venv; baseline 173 passed mantido).
 - Decisões de arquitetura do Executor (documentadas conforme exigido):
@@ -519,3 +532,18 @@ Executor deve:
 - Gate (literal, pós-mudança): `python -m pytest -q` → `189 passed in 90.49s`; `python -m ruff check .` → `All checks passed!`.
 - Vocabulário: nada altera interpretação científica (texto de caveat e instrumentação de operação apenas).
 - Próximo passo: decisões já registradas no Log anterior (projeção orbital→céu, Tarefa C com autorização explícita, refinamentos por uso real do dashboard).
+
+### 2026-09-09 13:29Z Cline (Executor) — Item (b): execução OFICIAL do selection-bias-check com config corrigida sobre a run de referência
+- Status: concluído (nenhum código novo; comando existente rodado contra a run real; artefato de referência substituído conforme autorização).
+- **Run escolhida (passo 1, justificativa):** `screen_20260903T211311606520Z`. Inventário de `runs/`: 2 `montecarlo_*` (não são screening de candidatos; descartadas), 2 `screen_*` de budget `low` (50 yr, 5 candidatos — descartadas por budget menor) e 2 `screen_*` de budget `medium` (200 yr, 8 candidatos): `204018` tem apenas **14 ETNOs** incluídos (precedeu a validação final do catálogo; sem `diagnostics/`) e `211311` tem **16 ETNOs**, replay `python main.py screen --budget configs/budgets/medium.yaml --seed 12345 --candidates data/candidates_quadro2.csv --etnos data/etnos/catalog_validated.csv`, é a mais recente e a referência já citada em TASK.md/docs/LIMITACOES.md, além de já portar o artefato de bias-check anterior. Legítima e mais atual.
+- **Segurança:** artefato antigo copiado antes da sobrescrita para `%TEMP%\p9_bias_recheck\selection_bias_OFFICIAL_PRE_20260909.json` (runs/ é gitignored — sem backup seria irrecuperável). Snapshot de `blockers.json` antes/depois idem.
+- **Execução oficial (passo 2):** `python main.py selection-bias-check --from-run runs\screen_20260903T211311606520Z` — config canônica (`ossos_filling_factor: 0.9067`, `use_ossos_footprint: false` → modo `uniform_filling_factor`; footprint real permanece para o item (a), que depende da projeção orbital→céu não implementada). Novo artefato gravado em `runs/<rid>/diagnostics/selection_bias.json` (evento `selection_bias_check_completed` em 2026-09-09T13:23:01Z no `events.log`).
+- **Números oficiais (passo 3):** `real_catalog_resultant_length_R = 0,299836`; `surviving_synthetic_resultant_length_R = 0,032567`; `real_exceeds_synthetic_R = true`; `surviving_fraction = 0,1918` (959/5000 sintéticos sobreviventes); `bias_model = h_prior_from_catalog` (16 H do SBDB, mediana 6.465); `n_real_catalog = 16`; `ossos_footprint_mode = uniform_filling_factor`. **Caveats na íntegra (verbatim do JSON):** (1) "Modelo angle-only (omega, Omega, M): nao modela geometria de footprint real nem cadencia real do survey."; (2) "Depth efficiency: OSSOS quadratic-logistic curve (Bannister et al. 2018, ApJS 236:18) evaluated at V = H + 5 log10(r·Delta) per-object, when distances are available; H-only linear stand-in otherwise."; (3) "Sky coverage: OSSOS filling factor 0.9067 applied as uniform per-object survival probability (0.9067 = mean across 2013A-E and 2013A-O blocks, the default this config may override; Bannister et al. 2016a; angle-only population has no sky-plane position)." — nota: já usa o caveat DINÂMICO do commit `cae0958`, agora validado em execução real; (4) "Resultado NAO deve ser citado como probabilidade de deteccao calibrada - e um teste de plausibilidade qualitativo.". `interpretation`: "O catalogo real tem concentracao angular (R) maior que a populacao sintetica sujeita ao mesmo modelo de selecao — o clustering real NAO e trivialmente explicado por vies de selecao neste modelo simplificado."
+- **Comparação com o resultado antigo (passo 4):** artefato pré-oficial (2026-09-04, fallback ≈0,485, modelo angle-only da época): R_sint 0,00593; 1742/5000 (0,3484); `real_exceeds_synthetic_R = true`. Oficial agora: R_sint 0,032567 (≈5,5× maior), sobrevivência 0,1918, `real_exceeds_synthetic_R = true` — **conclusão central MANTIDA em execução oficial** (não apenas na verificação isolada de ontem). R_real inalterado (0,299836; propriedade do catálogo). Razão R_real/R_sint cai de ≈50× (antigo, inflada pelo modelo mais restritivo) para ≈9,2× — o modelo corrigido explica mais clustering, porém ainda insuficiente para trivializar o observado. Determinismo cross-check: números idênticos aos da verificação de ontem contra o esqueleto em %TEMP% (mesma seed/catálogo por caminhos de resolução distintos).
+- **Blockers (passo 5):** antes = depois = só `etno_catalog_not_fully_validated` (science_limit). O `no_observational_bias_model` NÃO estava presente (removido em 2026-09-04T16:51:21Z — evento `no_observational_bias_model_blocker_removed` visível no histórico do `events.log`), logo a remoção automática da Tarefa A não tinha o que remover nesta execução: comportamento idempotente confirmado correto.
+- **Nova referência oficial (passo 6):** o artefato em `runs/screen_20260903T211311606520Z/diagnostics/selection_bias.json` (2026-09-09T13:23Z) SUBSTITUI o antigo como resultado válido daqui pra frente; qualquer citação futura dos números de bias-check deve usar os valores desta entrada. Apontamento em "Bloqueios" (B2): atualização do artigo PRONTA para preparação caso o Auditor julgue necessário, exigindo autorização explícita separada — **nenhum .docx foi tocado**.
+- Arquivos alterados: apenas `TASK.md` (B2 + esta entrada). Artefatos de run (`runs/...`) são gitignored e não entram no commit.
+- Gate (literal, inalterado — validação de continuidade): `python -m pytest -q` → `189 passed in 79.95s`; `python -m ruff check .` → `All checks passed!`.
+- Vocabulário: nada confirma nem descarta candidato; o resultado é de triagem exploratória dentro do protocolo ("clustering real não é trivialmente explicado por este modelo de viés simplificado").
+- Commit: docs (B2 + esta entrada).
+- Próximo passo: Auditor decide — (i) autorizar (ou não) atualização do artigo com os números oficiais (B2), (ii) item (a) do plano (projeção orbital→céu para habilitar o footprint real), ou (iii) Tarefa C (autorização explícita + benchmark na máquina de execução).
