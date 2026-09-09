@@ -36,3 +36,7 @@ Thumbs.db
 # artifacts, not source. runs/README.md stays tracked.
 runs/*/
 runs/latest_run.txt
+
+# Dashboard local state (job records, launch logs) — generated at runtime by
+# dashboard/runner.py (Tarefa D). Never tracked; see TASK.md Tarefa D rules.
+.dashboard/
