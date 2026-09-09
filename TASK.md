@@ -160,6 +160,83 @@ novo benchmark em "Log de execução" antes de pedir autorização.
 
 ---
 
+### Tarefa D — Dashboard de controle e visualização de runs
+**Prioridade: paralela — não bloqueia nem é bloqueada pelo Item 1
+(verificação do impacto do bugfix de cabeamento) nem pela Tarefa C.
+Modo de execução: AUTÔNOMO (não aguardar confirmação a cada passo;
+seguir até o critério de aceite ou até um dos dois bloqueios reais
+definidos abaixo).**
+
+Decisão de arquitetura (Auditor, já resolvida — não reabrir): **NiceGUI**.
+Motivo: projeto 100% Python, precisa disparar processos longos (a Tarefa C
+pode levar ~25h) sem travar a UI, e reaproveita funções/comandos do
+`cli.py` diretamente sem duplicar lógica em outra linguagem.
+
+**Escopo (4 funcionalidades):**
+1. Disparo de comandos do `cli.py` via formulário na UI, sem digitar no
+   terminal.
+2. Acompanhamento de progresso de runs em andamento (barra de progresso
+   ligada aos checkpoints que o pipeline já grava).
+3. Listagem de runs passadas: run_id, started_at/ended_at, status,
+   global_result_status como badge, blockers ativos como alerta visual.
+4. Relatório legível por run, lendo das pastas canônicas (evitar os
+   arquivos duplicados na raiz da run): `results/` (ranking, métricas,
+   candidatos), `audit/` (blockers, manifest), `diagnostics/`
+   (diagnósticos de viés e afins), `status.json` (raiz da run, não
+   duplicado).
+
+**Restrições de escopo (não negociável):**
+- Não alterar `cli.py` nem qualquer módulo de `planet9lab/` existente —
+  o dashboard só CHAMA os comandos já existentes (via subprocess ou
+  invocação de função), nunca refatora ou modifica o que já está testado.
+- Servidor NiceGUI deve bindar apenas em localhost/127.0.0.1 — nunca
+  0.0.0.0 nem exposto na rede.
+- Qualquer arquivo novo de estado/log/cache que o dashboard gerar (ex:
+  PID files, temp de sessão) deve ser adicionado ao `.gitignore` no
+  mesmo commit — não deixar arquivos soltos não-rastreados na raiz
+  (mesmo problema já visto e limpo antes com os `pytest_*.txt`).
+
+**Requisito não negociável (disciplina científica):** qualquer campo
+`caveats`/`interpretation` presente nos JSONs de diagnóstico deve aparecer
+no relatório da run NA ÍNTEGRA — sem paráfrase, resumo ou corte. Números
+(R, p-valor, scores) vêm direto dos arquivos, nunca recalculados ou
+aproximados na camada de UI. Escrever um teste automatizado que verifica
+programaticamente que todo texto de caveats/interpretation do JSON de
+origem aparece literalmente (substring exata) na saída/HTML do relatório
+gerado — este teste faz parte do gate, não é opcional.
+
+**Requisito de runs longas:** disparar via subprocess/processo
+independente da sessão da UI — uma run não pode depender de manter a
+aba/navegador aberta para sobreviver (crítico para a futura Tarefa C).
+Antes de declarar esse requisito bloqueado/incompatível, tentar pelo
+menos duas abordagens padrão (ex: `subprocess.Popen` desacoplado do
+processo pai + arquivo de status; ou `Start-Job`/processo de SO
+independente) e documentar o resultado de cada tentativa no Log — só
+reportar bloqueio real se ambas falharem, com evidência do que foi
+tentado.
+
+**Ordem recomendada:** adicionar a dependência (nicegui) e rodar o gate
+imediatamente (`pytest -q` + `ruff check .`) antes de escrever qualquer
+código novo — isolar cedo qualquer conflito de dependência do resto do
+trabalho.
+
+**Bloqueios que interrompem o modo autônomo (só estes dois):**
+(a) uma decisão exigir um dado/número que não existe no repositório nem
+em fonte confiável (mesma regra de nunca deduzir valores); ou (b) o
+requisito de runs sobreviverem ao fechamento da UI se mostrar
+incompatível após as duas tentativas documentadas. Em ambos os casos:
+documentar o bloqueio específico em "Bloqueios" e continuar o restante
+do escopo que não depende dele — não parar o trabalho todo.
+
+**Critério de aceite:** as 4 funcionalidades do escopo funcionando,
+teste de integridade de caveats/interpretation passando, runs longas
+sobrevivem ao fechamento da UI (com evidência da tentativa), restrições
+de escopo respeitadas (`cli.py` intocado, bind local apenas,
+`.gitignore` atualizado), gate limpo (`pytest -q` + `ruff check .`),
+commit feito, decisões de arquitetura documentadas no Log.
+
+---
+
 ## Continuidade (após A, B, C)
 
 Não parar e declarar o projeto concluído. Reler `docs/LIMITACOES.md` do
@@ -385,5 +462,23 @@ Executor deve:
 - Vocabulário: nada aqui confirma nem descarta viés de seleção; o modo footprint é exercício geométrico do porte fiel, não evidência de clustering induzido por seleção.
 - Commit: `f67a155` (5 files changed, 322 insertions, 11 deletions; entrada registrada em commit docs em seguida, push para origin/main).
 - Próximo passo: Auditor decide — (a) projeção orbital→céu verdadeira para tornar o filtro de footprint astrofisicamente informativo, (b) executar `selection-bias-check` em runs reais com a nova config, ou (c) avançar para Tarefa C (requer autorização explícita já prevista no plano).
+
+### 2026-09-09 01:32Z Cline (Executor) — Item 1 (prioridade imediata do Auditor): verificação do impacto do bugfix de cabeamento `f67a155`
+- Status: concluído (verificação pura — nenhuma linha de código alterada, comando existente rodado duas vezes).
+- Procedimento e decisões declaradas:
+  - A run de referência `screen_20260903T211311606520Z` NÃO foi mutada: `runs/` é gitignored (`.gitignore:37 runs/*/`), então sobrescrever `diagnostics/selection_bias.json` dela seria irrecuperável. As duas execuções rodaram contra uma CÓPIA verbatim do esqueleto da run (`audit/run_manifest.json` com `seed: 12345`, `audit/blockers.json`, `data_manifest.json`) em `%TEMP%\p9_bias_recheck\`. Os guardas do próprio comando garantem mesma amostra: `_resolve_run_etno_catalog` resolve `data\etnos\catalog_validated.csv` e recusa rodar se os ETNOs selecionados não reproduzirem `included_etnos` do data_manifest (16/16 ✓); `read_manifest` fornece o seed 12345 ✓.
+  - Isolamento do efeito do cabeamento: `ObservationalBiasConfig.ossos_filling_factor` é `float` (não aceita `null` via YAML) e o fallback `sky_coverage_deg2/41253` só dispara quando `None` — via CLI o fallback ficou inalcançável após `f67a155`. O CONTROLE usa `ossos_filling_factor: 0.48481322570479723` (= `repr(20000.0/41253.0)`, a probabilidade de sobrevivência de céu EFETIVA pré-`f67a155`) com todo o resto idêntico à config canônica — matematicamente equivalente ao comportamento antigo dentro do modelo atual.
+  - Contexto honesto: a run de referência (2026-09-03) PRECEDE o próprio repositório git (commit inicial `f922e26` é de 2026-09-07). Entre o artefato antigo e a config atual o modelo evoluiu (`4adec0f` H-prior SBDB; `7d5afb2` curva de eficiência OSSOS + distância/q-prior; `9956415` filling factor; `f67a155` cabeamento). Logo, antigo-vs-novo NÃO isola só o cabeamento — quem isola é o CONTROLE (modelo atual + fallback).
+- Números lado a lado (seed 12345, n=16, `catalog_validated.csv`; `R_real = 0,299836` em todos):
+  - ANTIGO (artefato `diagnostics/selection_bias.json` de 2026-09-03, modelo angle-only pré-repo, fallback ≈0,485): R_sintético = **0,00593**; sobreviventes = **1742/5000**; surviving_fraction = **0,3484**; `real_exceeds_synthetic_R` = **true**. (Backup do artefato em `%TEMP%\p9_bias_recheck\selection_bias_OLD_20260903.json`; valores já registrados verbatim em "Estado herdado".)
+  - CONTROLE (modelo atual pós-`f67a155` + `ossos_filling_factor: 0.48481322570479723`): R_sintético = **0,01455**; sobreviventes = **489/5000**; surviving_fraction = **0,0978**; `real_exceeds_synthetic_R` = **true**; `bias_model = h_prior_from_catalog`; `ossos_footprint_mode = uniform_filling_factor`.
+  - NOVO (modelo atual + `ossos_filling_factor: 0.9067` cabeado — config canônica): R_sintético = **0,032567**; sobreviventes = **959/5000**; surviving_fraction = **0,1918**; `real_exceeds_synthetic_R` = **true**; `bias_model = h_prior_from_catalog`; `ossos_footprint_mode = uniform_filling_factor`.
+- Veredito (passo 3 do Auditor): **a conclusão central se MANTÉM** — `real_exceeds_synthetic_R: true` nos três cenários. O efeito do cabeamento foi na direção esperada e declarada no Log `f67a155`: fator de céu menos restritivo (0,485 → 0,9067) → mais sobreviventes (489 → 959) → R sintético SOBE (0,01455 → 0,032567 no modelo atual), i.e., o modelo de viés corrigido fica MAIS capaz de gerar clustering — mas ainda ~9,2× abaixo de R_real (0,299836/0,032567 ≈ 9,2; no artefato antigo a razão era ~50×, inflada pelo modelo angle-only mais restritivo). O clustering real continua não sendo trivialmente explicado por este modelo de viés simplificado.
+- Consequência (passo 4): resultado mantém a conclusão → **nada registrado em "Bloqueios"**; nenhuma atualização de artigo/conclusões dependentes é necessária por este item.
+- Observações registradas (sem mudança de código neste item):
+  - O caveat de sky coverage é texto estático e cita "mean 0.9067" mesmo quando a config usa outro valor (visível no run de controle com 0.4848) — imprecisão cosmética de documento; tratar em tarefa própria se o Auditor julgar relevante.
+  - O reconciliation de blockers do caminho favorável (`remove_blocker`) rodou apenas na cópia Temp; o estado de auditoria da run de referência permanece intocado (o `blockers.json` dela já contém só `etno_catalog_not_fully_validated`, então o evento favorável seria no-op lá também).
+- Commit: docs (esta entrada + Tarefa D adicionada ao "Plano vigente" por instrução explícita do Auditor).
+- Próximo passo: Item 2 — Tarefa D (dashboard NiceGUI) em modo autônomo, começando pela adição da dependência `nicegui` + gate imediato (`pytest -q` + `ruff check .`) antes de qualquer código novo.
 
 
