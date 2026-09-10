@@ -299,11 +299,12 @@ Backup do artefato antigo: `%TEMP%\p9_bias_recheck\selection_bias_OFFICIAL_PRE_2
 ## Log de execução (só o Executor edita esta seção — sempre APPEND, nunca reescrever entradas antigas)
 
 <!-- Nova entrada abaixo desta linha, formato:
-### [AAAA-MM-DD HH:MMZ] <modelo> — <tarefa>
+### [AAAA-MM-DD HH:MMZ] <modelo> — <PC: hostname ou identificador> — <tarefa>
 - Status: concluído | parcial | bloqueado | aguardando decisão
 - O que foi feito / resultado real (números, testes, hashes, caminhos)
 - Commit: <hash> ou "pendente"
 - Próximo passo
+- PC: <hostname ou identificador> — $env:COMPUTERNAME do Windows (ex.: ALUNOSENAI). OBRIGATÓRIO em toda entrada.
 -->
 
 ### 2026-09-07 17:02Z Cline (Executor) — Fechamento Tarefa A + B1 + investigação viés (report-only)
@@ -546,4 +547,33 @@ Backup do artefato antigo: `%TEMP%\p9_bias_recheck\selection_bias_OFFICIAL_PRE_2
 - Gate (literal, inalterado — validação de continuidade): `python -m pytest -q` → `189 passed in 79.95s`; `python -m ruff check .` → `All checks passed!`.
 - Vocabulário: nada confirma nem descarta candidato; o resultado é de triagem exploratória dentro do protocolo ("clustering real não é trivialmente explicado por este modelo de viés simplificado").
 - Commit: docs (B2 + esta entrada).
+
 - Próximo passo: Auditor decide — (i) autorizar (ou não) atualização do artigo com os números oficiais (B2), (ii) item (a) do plano (projeção orbital→céu para habilitar o footprint real), ou (iii) Tarefa C (autorização explícita + benchmark na máquina de execução).
+
+### [2026-09-09 17:07Z] Cline (Executor) — PC: ALUNOSENAI — NOTA DE CONVENÇÃO: identificação de máquina no Log
+- Status: concluído
+- O que foi feito / resultado real: a partir desta entrada, TODAS as entradas do Log de execução passam a incluir identificação de máquina no cabeçalho, no campo `<PC: ...>` (valor de `$env:COMPUTERNAME` do Windows). Entradas anteriores a esta NÃO têm esse campo porque a convenção não existia ainda — não inferir de qual máquina vieram sem evidência explícita (algumas mencionam H:\, outras D:\, o que já é um indício indireto, mas não conclusivo). Hostname deste PC: ALUNOSENAI.
+- Commit: pendente
+- Próximo passo: manter o campo `<PC: ...>` em todas as entradas futuras, deste PC ou de outro.
+- PC: ALUNOSENAI
+
+### 2026-09-10 00:23Z Cline (Executor) — PC: LURIAT — PASSO 2: atualização do artigo v2 com os números oficiais (autorização B2)
+- Status: concluído (6 substituições aplicadas + 1 correção de resíduo; artigo em `docs/PLANET9_ARTIGO_v2_ABNT.docx`; nenhum código-fonte alterado).
+- **Contexto:** Auditor aprovou na seção "Bloqueios" (B2) a atualização do artigo com os números oficiais do selection-bias-check (`screen_20260903T211311606520Z`, 2026-09-09T13:23Z). PASSO 0 (confirmação read-only) e PASSO 1 (proposta de texto A/B/C/D) já reportados/aprovados anteriormente.
+- **Edições aplicadas (todas via substituição textual exata; estilo/formatação ABNT preservados — fontes, espaçamento, negrito/itaílico mantidos nos parágrafos tocados):**
+  - A — **RESUMO (L6):** `0,00593` (antigo) → `0,032567` (novo R_sintético sobrevivente).
+  - B — **§3.4 título (L65):** `Modelo de viés de seleção observacional: resultado inicial` → `Modelo de viés de seleção observacional: resultado` (remoção de "inicial").
+  - C — **§2.9 (L42 e L45):** `149 testes` → `189 testes`; texto de procedimento atualizado para `19,18% (959 de 5.000)` e adicionada nota entre parênteses sobre o footprint real (`cujo filtro posicional permanece desligado por padrão, com posição sintética sendo um proxy uniforme em céu, não uma projeção orbital→céu verdadeira`).
+  - D — **§3.4 ¶1 (L66):** `34,84%` + `0,00593` → `19,18% (959 de 5.000)` + `0,032567`; trecho completo reescrito para `a fração sobrevivente ao filtro de seleção foi de 19,18% (959 de 5.000), com modelo de viés h_prior_from_catalog (H reais de 16 objetos via JPL SBDB, mediana 6,465; eficiência de detecção OSSOS Bannister et al. 2018, ApJS 236:18). Sobre essa subpopulação sobrevivente, a estatística R de Rayleigh (semente 12345) resultou em R ≈ 0,032567 — ≈9,2× abaixo do catálogo real e ainda essencialmente uniforme, sem concentração angular detectável —, contra R = 0,299836 do catálogo real de 16 objetos.`
+  - E — **§3.4 ¶2 (L67):** adicionada a mesma nota entre parênteses sobre footprint real na enumeração de limitações.
+  - F — **§3.5 (L70):** `149 testes` → `189 testes`.
+  - G — **CORREÇÃO DE RESÍDUO (L46, §2.9):** após as substituições principais, verificação automatizada detectou `34,84%` remanescente no parágrafo de procedimento → substituído por `19,18% — 959 de 5.000`.
+- **Releitura pós-edição (PASSO 3):** verificação automatizada (Python `python-docx`) confirmou — **nenhum número antigo restante** (`0,00593`, `0,3484`, `34,84%`, `149 testes` todos limpos) e **todos os números oficiais presentes** (`0,032567`, `19,18%`, `189 testes`, `0,299836`, `9,2`). §3.4 ¶3 e §3.5 permaneceram intactas (já confirmado que não precisavam mudar). Nenhuma referência cruzada quebrada detectada.
+- **Observação sobre `0,1918`:** o número `0,1918` (fração decimal) não aparece no texto — em seu lugar, usa-se `19,18% (959 de 5.000)` (formato percentual + contagem), decisão de estilo consistente entre L46 e L66. Não é ausência indevida.
+- **Pendência de ambiente (não bloqueante, registrada para não se perder):** durante esta sessão, `.venv\pyvenv.cfg` apontava para `C:\Users\AllunoSenai\...` (erro de caminho entre PCs). Gate passou pela rota alternativa (`H:\planet9-screening-lab\.venv\Scripts\python.exe` direto). O `pyvenv.cfg` foi corrigido localmente para `C:\Users\lucas\AppData\Local\Programs\Python\Python311\python.exe`, mas **essa correção de ambiente NÃO está neste commit** — `.venv\` é gitignored (`.gitignore:32 .venv/`). Se o venv vier a ser recriado em qualquer das máquinas, garantir que o `pyvenv.cfg` aponte para o Python correto daquela máquina antes de rodar o gate.
+- Arquivos alterados: `docs/PLANET9_ARTIGO_v2_ABNT.docx` (novo, untracked → adicionado) + `TASK.md` (esta entrada).
+- Gate (literal): `python -m pytest -q` → `189 passed in 79.97s`; `python -m ruff check .` → `All checks passed!`.
+- Vocabulário: mantido o tom conservador aprovado (sem "confirma" nem "descarta" viés de seleção; "clustering real não é trivialmente explicado por este modelo de viés simplificado").
+- Commit: docs (artigo v2 atualizado + entrada no Log; B2 do Auditor).
+- Próximo passo: Auditor decide — (i) item (a) do plano (projeção orbital→céu para habilitar o footprint real) ou (ii) Tarefa C (autorização explícita + benchmark na máquina de execução). Artigo atualizado; sem pendências de escrita imediatas.
+- PC: LURIAT
