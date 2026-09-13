@@ -58,6 +58,11 @@ pipeline principal, com gate confirmado (151 passed) NAQUELA sessão —
 ### Tarefa A — Blocker automático de viés de seleção
 **Prioridade: primeira.**
 
+**STATUS: ✅ CONCLUÍDA** — implementação entregue e fechada no Log (evento de
+remoção `blocker_removed` evidenciado em 2026-09-04 e fechamento registrado em
+`04d5bd2`; testes de resultado favorável/desfavorável no gate). Texto abaixo
+mantido como registro histórico do escopo original.
+
 Hoje `planet9lab/robustness.py::merge_blocker` só adiciona blockers a
 `audit/blockers.json`, nunca remove. Quando
 `selection_bias.py::run_selection_bias_check` roda com resultado
@@ -89,6 +94,17 @@ favorável, testes cobrindo os dois casos, gate limpo, commit feito.
 
 ### Tarefa B — Melhorar o modelo de viés de seleção observacional
 **Prioridade: segunda, após A concluída e commitada.**
+
+**STATUS: 🔶 PARCIAL** — passos 1-3 e 5-6 concluídos (B1 resolvido —
+`poly_footprint.py` confirmado; H-prior do SBDB em `4adec0f`; curva de
+eficiência OSSOS Bannister et al. 2018 em `7d5afb2`; footprint geométrico
+real opt-in e cabeamento do filling factor em `f67a155`/`9956415`;
+LIMITACOES.md atualizado). **Item (a) — projeção orbital→céu: ✅ CONCLUÍDO
+NO CÓDIGO em `planet9lab/geometry/sky_projection.py` (commit `b831af9`, 9
+testes) mas ❌ NÃO INTEGRADO ao `generate_synthetic_population`/pipeline
+principal** — a integração (substituir o proxy uniforme de posição e em que
+modo/época) permanece pendente de autorização do Auditor. Ver nota em
+`docs/LIMITACOES.md` (2026-09-13).
 
 O modelo atual (`planet9lab/selection_bias.py`) é angle-only: 2 dos 3
 fatores (profundidade em magnitude, arco de rastreamento mínimo) são
@@ -166,6 +182,13 @@ novo benchmark em "Log de execução" antes de pedir autorização.
 Modo de execução: AUTÔNOMO (não aguardar confirmação a cada passo;
 seguir até o critério de aceite ou até um dos dois bloqueios reais
 definidos abaixo).**
+
+**STATUS: ✅ CONCLUÍDA** — dashboard implementado em `dashboard/`
+(commit `6249541`, 8 módulos), validação visual real executada (servidor
+HTTP + render 4/4 telas, 2026-09-09) e caveat de sky coverage dinâmico
+corrigido em `cae0958`. Run longa: abordagem 1 (`subprocess.Popen`
+desacoplado em `runner.py`) aprovada. Texto abaixo mantido como registro
+do escopo e restrições originais.
 
 Decisão de arquitetura (Auditor, já resolvida — não reabrir): **NiceGUI**.
 Motivo: projeto 100% Python, precisa disparar processos longos (a Tarefa C
@@ -248,23 +271,14 @@ Ver `.clinerules`, seção "Continuidade", para o processo completo.
 
 ## Bloqueios (só o Executor edita esta seção)
 
-### B1 — Origem do módulo poly_footprint.py não confirmada nesta sessão
+### B1 — Origem do módulo poly_footprint.py — RESOLVIDO (verificado nesta cópia)
 Um relatório de outra sessão/máquina do Cline descreveu a criação de
 `planet9lab/geometry/poly_footprint.py` + `__init__.py`, portando
 `create_poly` e `point_in_polygon` do Fortran do OSSOS SurveySimulator
-(fonte: `H:\_tmp_ossos_survey`). Isso **não foi confirmado como existente
-nesta cópia do repositório**. Antes de a Tarefa B depender disso, o
-Executor deve:
-1. `Test-Path planet9lab\geometry\poly_footprint.py` e
-   `Test-Path planet9lab\geometry\__init__.py`.
-2. Se existir: `python -c "from planet9lab.geometry.poly_footprint import create_poly, point_in_polygon; print('import OK')"`.
-3. Verificar `H:\_tmp_ossos_survey` existe e contém de fato código Fortran
-   do OSSOS (não confiar apenas no nome da pasta).
-4. Reportar aqui o resultado antes de a Tarefa B prosseguir com essa
-   dependência. Se não existir, a Tarefa B segue sem essa base (só o
-   fator de magnitude aparente, sem footprint geométrico real por ora).
-
-*(Preencher resultado abaixo desta linha quando investigado:)*
+(fonte: `H:\_tmp_ossos_survey`). **Este bloqueio foi RESOLVIDO e a
+existência do módulo confirmada nesta cópia do repositório** (procedimento
+de verificação executado em 2026-09-07, resultado registrado abaixo).
+Não há pendência ativa aqui; a Tarefa B pode apoiar-se no módulo.
 
 **Resultado (2026-09-07, Executor): B1 RESOLVIDO — confirmado nesta sessão.**
 1. `Test-Path planet9lab\geometry\poly_footprint.py` → True;
@@ -280,18 +294,19 @@ Executor deve:
 4. A Tarefa B pode apoiar-se em `planet9lab/geometry/poly_footprint.py`
    como base (footprint geométrico real disponível).
 
-### B2 — Atualização do artigo: informação pronta, aguardando decisão do Auditor (informativo, não bloqueia execução)
+### B2 — Atualização do artigo — EXECUTADO (pendência fechada)
 A run `screen_20260903T211311606520Z` passou por execução OFICIAL do
 `selection-bias-check` com a config canônica corrigida (filling factor
 0,9067 — ver Log 2026-09-09), que substitui o artefato antigo (fallback
 ≈0,485) como referência válida do projeto. A conclusão
 (`real_exceeds_synthetic_R: true`) se mantém — nenhum texto científico
-existente fica invalidado. SE o Auditor julgar necessário citar no artigo
-os números novos (R sintético 0,032567 vs 0,00593 do artefato antigo,
-sobrevivência 0,1918 vs 0,3484), a atualização do
-`docs/PLANET9_ARTIGO_v1.2_ABNT.docx` está PRONTA para preparação, mas
-EXIGE autorização explícita e separada (nenhum .docx foi tocado).
-Backup do artefato antigo: `%TEMP%\p9_bias_recheck\selection_bias_OFFICIAL_PRE_20260909.json`.
+existente fica invalidado. **A atualização do artigo FOI EXECUTADA:** o
+arquivo de destino é `docs/PLANET9_ARTIGO_v2_ABNT.docx` (versão vigente; as
+versões antigas v1.2/DRAFT/BACKUP e antecessoras foram movidas para
+`docs/archive/` em 2026-09-13), com os números oficiais aplicados no commit
+`424175b` (R sintético 0,032567, sobrevivência 0,1918, 189 testes) e
+verificação automatizada pós-edição (nenhum número antigo remanescente).
+**Pendência B2 fechada — nada a fazer nesta seção.**
 
 
 ---
@@ -599,5 +614,22 @@ Backup do artefato antigo: `%TEMP%\p9_bias_recheck\selection_bias_OFFICIAL_PRE_2
 - Vocabulário: instrumentação geométrica — nenhuma constante/resultado altera a interpretação de clustering do catálogo; nada novo "confirmado" nem "descartado". A projeção continua NÃO integrada, então o caveat atual do artigo (proxy uniforme) permanece factualmente correto até a integração.
 - Commit: `b831af9` (código + testes + pyproject; 3 files, 129 insertions) + este commit docs (TASK.md).
 - Próximo passo: Auditor decide entre — (i) integrar `orbital_elements_to_radec` ao `generate_synthetic_population` (época/modo? ex. `use_ossos_footprint: true`?) e re-rodar o `selection-bias-check` sobre a run de referência, ou (ii) Tarefa C (autorização explícita + benchmark na máquina de execução). Nada iniciado sem autorização.
+- PC: LURIAT
+
+### 2026-09-13 Cline (Executor) — Auditoria e organização pré-Tarefa C (itens A–F aprovados pelo Auditor)
+- Status: concluído (nenhum código funcional alterado — gate inalterado 198 tests; limpeza, documentação e arquivamento apenas).
+- Contexto: auditoria read-only prévia (Parte 1) reportou a síntese de achados A–F; o Auditor aprovou a execução na ordem registrada nestas entradas.
+- A — **Lixo rastreado removido (`git rm`):** `scripts/_tmp_artigo_dump.txt`, `scripts/_tmp_artigo_v1_2_dump.txt`, `scripts/_tmp_artigo_v1_2_DRAFT_dump.txt`, `scripts/_tmp_novo_modelo_dump.txt` (dumps de extração de texto das sessões de edição dos artigos; não eram cobertos por `.gitignore`).
+- B — **`docs/LIMITACOES.md` atualizado (4 seções):** adicionadas as notas honestas de que `planet9lab/geometry/sky_projection.py` existe, está testado (9 testes, commit `b831af9`) e implementa a projeção orbital→céu real (REBOUND + Terra kepleriana Meeus 1998 + rotação IAU 2006), **mas NÃO está integrado** ao `generate_synthetic_population`/pipeline principal — o proxy uniforme continua sendo a posição gerada até a integração ser autorizada. Nenhum texto de limitação existente apagado (continua verdadeiro).
+- C1 — **Bloqueio B1 reescrito como RESOLVIDO** (remoção da redação de pendência ativa "não foi confirmado nesta cópia"; resultado 2026-09-07 preservado verbatim).
+- C2 — **Bloqueio B2 reescrito como EXECUTADO/pendência fechada** — arquivo de destino agora é `docs/PLANET9_ARTIGO_v2_ABNT.docx` (não mais v1.2); números oficiais aplicados no commit `424175b`; versões antigas movidas para archive.
+- D — **Plano vigente atualizado:** Tarefa A ✅ CONCLUÍDA (fechamento `04d5bd2`); Tarefa B 🔶 PARCIAL (passos 1-3 e 5-6 concluídos; item (a) projeção orbital→céu ✅ concluído no código `b831af9` mas ❌ NÃO integrado — pendente de autorização); Tarefa C **intocada** (campo "AUTORIZAÇÃO PARA INICIAR: ⬜ NÃO AUTORIZADA AINDA" preservado); Tarefa D ✅ CONCLUÍDA (`6249541` + validação visual real + `cae0958`).
+- E — **Arquivamento:** criada `docs/archive/` e movidos via `git mv`: `PLANET9_ARTIGO_v1.2_ABNT.docx`, `PLANET9_ARTIGO_v1.2_ABNT_BACKUP_pre_edicao.docx`, `PLANET9_ARTIGO_v1.2_ABNT_DRAFT.docx`, `NOVO_MODELO_ARTIGO.docx`, `Artigo_FEBRACE_revisado.docx`. Confirmado: `docs/PLANET9_ARTIGO_v2_ABNT.docx` **permanece em docs/** (não movido).
+- F — **`docs/PLANET9_ARTIGO_v2_ABNT.docx.bak` deletado do disco** (gitignored, não gerou diff).
+- Gate (literal, pós-mudança — nenhum código funcional tocado): `python -m pytest -q` → **198 passed** (inalterado); `python -m ruff check .` → **All checks passed!**.
+- Arquivos no commit: `scripts/_tmp_*.txt` (4 removidos), `docs/LIMITACOES.md` (notas sky_projection), `TASK.md` (Bloqueios B1/B2 + status das Tarefas A/B/D no Plano + esta entrada), `docs/archive/*.docx` (5 movidos).
+- Vocabulário: nenhuma alteração de interpretação científica — o artefato `selection_bias.json` e a conclusão da seção de bias se mantêm; a projeção orbital→céu segue **não integrada** (caveat do artigo e do LIMITACOES.md continuam factualmente corretos).
+- Commit: único — `f8bf51e` (esta entrada incluída no mesmo commit; 11 files changed, 75 insertions, 425 deletions; renames 100% dos .docx arquivados).
+- Próximo passo: nada bloqueado por esta organização; Tarefa C segue aguardando autorização explícita + benchmark na máquina de execução (requisito inalterado). O Plano vigente, os Bloqueios e o LIMITACOES.md agora refletem o estado real do repo.
 - PC: LURIAT
 

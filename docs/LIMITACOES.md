@@ -166,6 +166,14 @@ DESLIGADO (`use_ossos_footprint: false`) porque as posições
 aleatórios — não uma projeção orbital→céu real — e o footprint 2013A cobre
 ~0,07% da esfera celeste: ativá-lo por padrão colapsaria a amostra sintética
 sobrevivente a um punhado de objetos e tornaria a comparação de R degenerada.
+**Nota (2026-09-13):** o módulo `planet9lab/geometry/sky_projection.py` já
+existe, está testado (9 testes, commit `b831af9`) e implementa a projeção
+orbital→céu real via REBOUND (posição do objeto) + Terra kepleriana (Meeus,
+Astronomical Algorithms 1998, Cap. 25) + rotação eclíptica→equatorial com
+obliquidade IAU 2006 — mas NÃO está integrado ao
+`generate_synthetic_population`/pipeline principal. As populações sintéticas
+continuam usando o proxy uniforme até a integração ser autorizada; o texto
+acima permanece verdadeiro para o estado integrado atual.
 
 **Limitações que impedem tratar isto como confirmação forte (reportar
 sempre junto com o resultado acima, nunca isolado):**
@@ -206,7 +214,14 @@ sempre junto com o resultado acima, nunca isolado):**
   posicional. O modo com footprint é geometricamente real, mas
   astrofisicamente não informativo enquanto a posição for proxy uniforme:
   ele exercita a geometria do footprint, não mede clustering induzido por
-  viés. Próximo passo: projeção orbital → posição angular verdadeira.
+  viés. **Nota (2026-09-13):** a projeção orbital→céu verdadeira já existe em
+  `planet9lab/geometry/sky_projection.py` (`orbital_elements_to_radec`, 9
+  testes no gate, commit `b831af9`) — REBOUND + Terra kepleriana + rotação IAU
+  2006 — mas **ainda não foi integrada** ao `generate_synthetic_population`
+  do pipeline; até essa integração ser autorizada, o proxy uniforme continua
+  sendo a posição real gerada e, com ele, o modo footprint não mede
+  clustering induzido por viés. Próximo passo (pendente de autorização):
+  integrar `orbital_elements_to_radec` e re-avaliar o modo footprint.
 - Não modela cadência real (DES, OSSOS, etc.).
 - O resultado não deve ser citado como probabilidade de detecção calibrada.
 - `selection-bias-check` desativa o blocker antigo
@@ -223,7 +238,12 @@ seleção dependente de magnitude aparente real com função de fase
 (requer ângulo de fase α sintético) e projeção orbital→céu verdadeira para
 tornar o filtro de footprint geométrico real (já implementado como opt-in,
 ver Atualização 2026-09-08) astrofisicamente informativo em vez de apenas
-geométrico.
+geométrico. **Nota (2026-09-13):** a projeção orbital→céu já não é item
+futuro — `planet9lab/geometry/sky_projection.py` existe e está testado (9
+testes, commit `b831af9`), pronto para integração; o que falta é a decisão de
+integrá-lo ao `generate_synthetic_population` (substituindo o proxy uniforme
+e em que modo/época) e, depois, re-avaliar o modo footprint. Os demais
+próximos passos acima (função de fase, cadência real) permanecem válidos.
 
 ## Atualização V2 (item 2 do plano V1->V2: Monte Carlo / QMC)
 
