@@ -577,3 +577,27 @@ Backup do artefato antigo: `%TEMP%\p9_bias_recheck\selection_bias_OFFICIAL_PRE_2
 - Commit: docs (artigo v2 atualizado + entrada no Log; B2 do Auditor).
 - Próximo passo: Auditor decide — (i) item (a) do plano (projeção orbital→céu para habilitar o footprint real) ou (ii) Tarefa C (autorização explícita + benchmark na máquina de execução). Artigo atualizado; sem pendências de escrita imediatas.
 - PC: LURIAT
+
+### 2026-09-13 Cline (Executor) — Item (a) da Tarefa D (continuação): módulo `planet9lab/geometry/sky_projection.py` implementado + 9 testes dedicados
+- Status: concluído (módulo standalone validado; **integração com `selection_bias.py` NÃO feita — aguarda decisão do Auditor**, ver "Próximo passo"). Anti-requisito do plano respeitado: nenhuma execução cara/longa iniciada.
+- O que foi feito / resultado real:
+  - **`planet9lab/geometry/sky_projection.py` (novo)** — projeção orbital→RA/Dec (item (a) do plano, pendência do footprint real). Pipeline de 5 passos documentado no docstring: (1) posição heliocêntrica eclíptica J2000 do objeto via `rebound.Simulation` (massa central 1 M☉, partícula sem massa, elementos a/e/i/ω/Ω/M); (2) posição da Terra via elementos keplerianos (Meeus, Astronomical Algorithms 1998, Cap. 25 — constantes com atribuição no módulo); (3) vetor geocêntrico = objeto − Terra (ainda eclíptico J2000); (4) rotação eclíptica→equatorial com obliquidade IAU 2006 (84381,406 arcsec — decisão do Auditor, não reaberta); (5) RA/Dec em graus: RA ∈ [0, 360) via atan2, Dec via asin de z/r clampado a [−1, 1] → ∈ [−90, 90].
+  - Constantes do módulo com atribuição: `OBLIQUITY_ARCSEC = 84381.406` (IAU 2006, decisão do Auditor no plano), elementos terrestres (Meeus 1998, Cap. 25): a=1,000001018 UA, e=0,0167086, ω=102,9373°, M_J2000=358,617°, taxa média n=0,9856076686°/dia; `DEFAULT_EPOCH_JD = 2456800.5` (época de referência do catálogo). Erro declarado da aproximação kepleriana (sem perturbações planetárias): ~1000 km na posição da Terra (já aprovado como Opção A no plano).
+  - Abordagem geocêntrica completa conforme aprovado (objeto REBOUND − Terra kepleriana, depois rotação de obliquidade), não um atalho.
+- **Valores reportados (a pedido do Auditor, ≥2 casos):**
+  - CASO 1 — Terra no epoch `DEFAULT_EPOCH_JD` (2456800,5): r = **1,012631 UA** (≈ afélio). Posição heliocêntrica eclíptica: (−0,464993, −0,899558, 0,000000) UA.
+  - CASO 2 — objeto distante trivial (a=1000, e=0, i=0, ω=0, Ω=0, M=0): RA = **0,0473°**, Dec = **0,0205°** (≈ (0,0) equatorial).
+  - CASO 3 — objeto com i=60°, e=0,3, ω=90°, Ω=120°, M=60°: RA = **305,9332°**, Dec = **−23,2289°**.
+  - CASO 4 — objeto com i=0° (plano eclíptico), ω=90°, M=0°: RA = 89,7122°, Dec = **23,4390°** (= obliquidade; sanidade da rotação).
+  - CASO 5 — objeto com i=60°, mesmo ω/Ω/M do caso 4: RA = 87,8263°, Dec = **82,9899°** (i empurra Dec ao polo).
+  - Verificações automáticas: RA ∈ [0, 360) ✓; Dec ∈ [−90, 90] ✓; i=0 → Dec na banda da obliquidade ±23,44° ✓; |Dec(i=60)| > |Dec(i=0)| ✓.
+- **Testes novos — `tests/test_sky_projection.py` (9):** Terra no epoch do catálogo (r≈1,0126 UA), Terra no plano eclíptico (z≈0), Terra em J2000 (r em [0,98, 1,02] UA), RA/Dec em faixa para i ∈ {0,15,30,60,89}°, objeto distante → (RA,Dec)≈(0,0), inclinação alta desloca Dec, obliquidade fixa (84381,406 arcsec), epoch fixo (2456800,5). Dois erros de teste corrigidos durante o desenvolvimento (dos MEUS testes, não do módulo): (1) em J2000 a Terra está com M=358,617° ≈ periélio → r≈0,983 UA, não 1,000001018 — virei faixa; (2) com ω=0 e M=0 o objeto está no nó ascendente (eixo X) e a inclinação não muda a posição — passei ω=90° no teste de inclinação.
+- **Nota de dependência (python-docx):** `python-docx` (1.2.0, `import docx` OK) usado nas sessões de edição do artigo NÃO estava declarado — adicionado a `pyproject.toml` (dependencies; instalação fica do lado do ambiente/venv). Nada fora do escopo tocado em `planet9lab/`.
+- **Não feito (declarado):** NÃO integrei `orbital_elements_to_radec` a `selection_bias.py`/`generate_synthetic_population`. A decisão de integração (substituição do proxy uniforme e em que modo/época) é do Auditor — ver "Próximo passo".
+- Gate (literal, pós-mudança): `python -m pytest -q` → **198 passed in 83.89s** (189 → 198, +9); `python -m ruff check .` → **All checks passed!** (limpei F401/I001 antes; re-rodado limpo).
+- Arquivos alterados: `planet9lab/geometry/sky_projection.py` (novo), `tests/test_sky_projection.py` (novo), `pyproject.toml` (+`python-docx`), `TASK.md` (esta entrada).
+- Vocabulário: instrumentação geométrica — nenhuma constante/resultado altera a interpretação de clustering do catálogo; nada novo "confirmado" nem "descartado". A projeção continua NÃO integrada, então o caveat atual do artigo (proxy uniforme) permanece factualmente correto até a integração.
+- Commit: `b831af9` (código + testes + pyproject; 3 files, 129 insertions) + este commit docs (TASK.md).
+- Próximo passo: Auditor decide entre — (i) integrar `orbital_elements_to_radec` ao `generate_synthetic_population` (época/modo? ex. `use_ossos_footprint: true`?) e re-rodar o `selection-bias-check` sobre a run de referência, ou (ii) Tarefa C (autorização explícita + benchmark na máquina de execução). Nada iniciado sem autorização.
+- PC: LURIAT
+
