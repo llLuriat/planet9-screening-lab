@@ -15,6 +15,7 @@ dependencies = [
   "ruff",
   "rebound",
   "nicegui",
+  "python-docx",
 ]
 
 [tool.pytest.ini_options]
