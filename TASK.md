@@ -633,3 +633,26 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
 - Próximo passo: nada bloqueado por esta organização; Tarefa C segue aguardando autorização explícita + benchmark na máquina de execução (requisito inalterado). O Plano vigente, os Bloqueios e o LIMITACOES.md agora refletem o estado real do repo.
 - PC: LURIAT
 
+### 2026-09-13 Cline (Executor) — PC: LURIAT — Benchmark REAL de custo de integração executado nesta máquina (autorização pontual do Auditor; Tarefa C NÃO autorizada)
+- Status: concluído (medição real; nenhum código funcional alterado; apenas resultados/hardware_benchmark.json + docs/LIMITACOES.md + esta entrada).
+- **Autorização restrita:** o Auditor autorizou EXCLUSIVAMENTE rodar `python scripts\benchmark_integration_cost.py` nesta máquina. **A Tarefa C (run secular 4 Gyr) continua NÃO AUTORIZADA** (campo ⬜ no Plano vigente intacto) e **NÃO foi iniciada**. O item (a) (integração de `sky_projection.py`) **não foi integrado** nesta tarefa.
+- **Contexto de hardware (fato novo, não suavizado):** o benchmark de referência até hoje foi medido no **i5-14400 (16 threads)** em 2026-09-03 (`results/hardware_benchmark.json`, 347.886 anos/s). Esta máquina é **LURIAT = Xeon E3-1230 V2 @ 3,30 GHz, 4 núcleos/8 threads, Windows 11 Pro 10.0.26200, rebound 5.1.1** — hardware DIFERENTE, portanto o número antigo não vale aqui (pré-requisito do plano: medir na máquina de execução).
+- **Proteção do artefato antigo (passo 1):** `results/hardware_benchmark.json` (i5-14400) copiado para `results/hardware_benchmark_PREVIOUS_i5-14400.json` ANTES de rodar o script. Confirmado por hash: o original e o backup foram preservados (o script SOBRESCREVE `results/hardware_benchmark.json` in-place — linha 203 do script — então o backup era obrigatório e foi feito corretamente).
+- **Execução (passo 2):** `python scripts\benchmark_integration_cost.py` rodou até concluir. Confirmado lendo o script antes: é benchmark CURTO (calibração de 2.000 anos simulados), NÃO a Tarefa C completa. Calibração real: **2000,0 anos em 0,014 s**.
+- **Resultado real (passos 3/4, literal do script/JSON):**
+  - `simulated_years_per_second`: **145.708,8737** anos/s (245.448 timesteps/s, single branch single core)
+  - `measured_on`: 2026-09-13T22:53:25Z; `rebound_version`: 5.1.1; `logical_cpus`: 8; `cpu_model`: Intel64 Family 6 Model 58 Stepping 9
+  - Projeção para o horizonte alvo **4 Gyr** (`secular.yaml`): **7,626 h/branch**, **15,251 h/par com/sem P9**, **76,256 h para o set de exemplo do script (5 candidatos)**, **≈122,0 h (≈5,1 dias) para os 8 candidatos do Quadro 2** (série single-core)
+  - `recommended_integration_years`: **4000000000** (4 Gyr cabe nos 48h/par de budget)
+- **Comparação com benchmarks anteriores (passo 6):**
+  - i5-14400 (16t, 2026-09-03): 347.886 anos/s → 6,388 h/par, ~51 h para 8 candidatos (4 Gyr)
+  - Windows8core antigo (8t, 2026-08-28, rebound 5.0.0): 174.260 anos/s → 12,752 h/par, ~102 h para 8 candidatos
+  - **LURIAT/Xeon agora (8t, rebound 5.1.1): 145.709 anos/s → 15,251 h/par, ≈122 h para 8 candidatos** — ≈2,4× mais caro que o i5-14400
+  - Observação: o "~25,6h para os 8 candidatos" citado no texto da Tarefa C (i5-14400) mistura par com branch (6,388 h/par = 2 branches; ~25,6h = 8×3,194 h/branch de um só branch); o valor de 8 candidatos com par completo é ~51h naquele hardware.
+- **Documentação (passo 5):** `docs/LIMITACOES.md` seção de custo computacional atualizada — declara explicitamente que o número antigo (~6,4h/par, ~25,6h) é específico do i5-14400, registra o valor real medido nesta máquina (15,251 h/par; ≈122 h para os 8 candidatos) e reformula a advertência de que custo nunca deve ser citado como universal (medir na máquina de execução).
+- Gate (literal): `python -m pytest -q` → **198 passed**; `python -m ruff check .` → **All checks passed!**.
+- Arquivos alterados: `results/hardware_benchmark.json` (sobrescrito pelo script — agora da máquina LURIAT), `results/hardware_benchmark_PREVIOUS_i5-14400.json` (novo backup), `docs/LIMITACOES.md` (atualização honesta de custo), `TASK.md` (esta entrada).
+- Vocabulário: nenhuma mudança de interpretação científica (bias-check/clustering intactos); medição de custo operacional, sem tocar em números de seleção de candidatos.
+- Commit: único (benchmark + docs), hash no Log deste commit.
+- Próximo passo (só após nova autorização do Auditor): se a Tarefa C for rodar no LURIAT, o custo real para TO 8 candidatos do Quadro 2 em 4 Gyr é ≈122 h (~5,1 dias) — o Auditor tem agora o número real de horas projetadas para decidir (pode reduzir candidatos/horizonte, escolher outra máquina ou autorizar). Tarefa C NÃO autorizada; item (a) NÃO integrado.
+- PC: LURIAT

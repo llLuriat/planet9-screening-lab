@@ -292,6 +292,28 @@ estágio 3 for muito alto, reduza `max_stage3_samples` antes de rodar o scan
 completo com `n_points: 20000`, ou o comando pode ficar rodando por dias sem
 terminar o estágio 3.
 
+**Atualização 2026-09-13 — benchmark REAL executado no PC LURIAT (Xeon
+E3-1230 V2, 4 núcleos/8 threads, Windows 11 26200, rebound 5.1.1):**
+`scripts/benchmark_integration_cost.py` rodado de fato nesta máquina
+(calibração real de 2.000 anos em 0,014 s) → **145.708,9 anos simulados/s**
+(245.448 timesteps/s, single core). Projeções para o horizonte alvo de 4 Gyr
+do `secular.yaml`: **15,251 h por par com/without P9**, **76,256 h para o set
+de exemplo do script (5 candidatos)**, **≈122,0 h (≈5,1 dias) para os 8
+candidatos do Quadro 2** — em seríe single-core. `recommended_integration_years`
+do script: 4e9 (cabe no orçamento de 48h/par). Este JSON substitui o anterior em
+`results/hardware_benchmark.json` (referência antiga do i5-14400 preservada em
+`results/hardware_benchmark_PREVIOUS_i5-14400.json`).
+
+**IMPORTANTE — o número antigo não é universal:** a estimativa de **~6,4 h/par
+e ~25,6 h* citada no plano da Tarefa C é específica do **i5-14400 (16
+threads), 347.886 anos/s** e vale só para aquela máquina. O texto da Tarefa C
+mistura "par" com "branch": o i5-14400 mediu 6,388 h/par (= 2 branches,
+3,194 h/branch); ~25,6h = 8 candidatos × 1 branch (without_p9), não o par
+completo (que daria ~51 h para 8 candidatos). Para esta máquina (LURIAT,
+Xeon E3-1230 V2) a projeção real é **≈2,4× mais cara**: ~15,25 h/par → ~122 h
+para os 8 candidatos em 4 Gyr. Nenhum número de custo deve ser citado como se
+valesse para outra máquina — medir na máquina de execução, sempre.
+
 
 
 Havia um pacote local `pytest/` na raiz do projeto que **sombreava** qualquer
