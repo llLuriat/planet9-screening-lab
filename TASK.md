@@ -661,3 +661,21 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
   - Sistema do benchmark = sistema real da Tarefa C: `n_particles=10` = 1 Sol + 4 gigantes + 1 P9 + 4 ETNOs incluídos (`data/etnos/catalog.csv` tem 5 linhas de ETNO, 4 com `selection_included=True`); `data/candidates_example.csv` = 5 candidatos (o script usa o candidato 0 só como massa de exemplo e multiplica por `len(candidates)` para o set completo).
   - Conclusão: **ambos os números estão corretos** — 7,63 h/branch e 15,25 h/par; ~122 h para os 8 candidatos = 8 pares × 15,251 h (série single-core). `results/hardware_benchmark.json` e a entrada anterior deste Log estão consistentes; `docs/LIMITACOES.md` (L307-311) já documentava a distinção par/branch. Nenhuma correção necessária.
   - PC: LURIAT
+
+### 2026-09-14 00:40Z Cline (Executor) — Teste de escala do paralelismo (--max-workers) pré-decisão Tarefa C
+- Status: concluído (medição de escala com horizonte curto; NENHUMA integração de 4 Gyr rodada; **Tarefa C segue NÃO AUTORIZADA**).
+- Objetivo: medir o ganho real de `--max-workers` antes de decidir se a Tarefa C roda nesta máquina ou espera outra.
+- Mecanismo (parte 1 do pedido): `planet9lab/parallel.py` usa `concurrent.futures.ProcessPoolExecutor` — **multiprocessing REAL** (cada worker é um processo Python próprio com seu próprio REBOUND; sem GIL compartilhado entre branches). `max_workers=1` força o caminho sequencial; default = `min(cpu_count, 16)` (L52); existe fallback silencioso para sequencial se o pool não subir (L84-89) — **verificado que NÃO houve fallback** (nenhum warning nos logs; pico de RAM compatível com 9 processos).
+- Metodologia: `python main.py screen --budget <yaml> --seed 12345 --candidates data/candidates_quadro2.csv --etnos data/etnos/catalog_validated.csv` (8 candidatos), tempo de parede via `Measure-Command` e RAM monitorada por job (amostragem 500 ms). Budgets: `configs/budgets/medium.yaml` (200 yr, o pedido) + dois horizontes maiores com config **TEMPORÁRIA FORA do repo** (`%TEMP%\p9_wscale_budget.yaml`, 20.000 e 200.000 yr — nenhum arquivo do repositório criado/alterado; `serious.yaml` é formato V1, incompatível com `screen`).
+- Resultados (wall clock, mesma seed/catálogo/config):
+  - 200 yr: série **2,88 s** vs paralelo **5,91 s** → fator **0,49×** (paralelo MAIS LENTO: o startup do pool, ~5-5,6 s no Windows spawn, domina — budget de 200 yr NÃO mede scaling de integração).
+  - 20.000 yr: 8,65 s vs 6,30 s → 1,37× (ainda contaminado pelo startup).
+  - 200.000 yr: **63,02 s vs 18,93 s → fator de parede 3,33×** (95% do tempo é integração — régua limpa).
+- Speedup de compute (decomposição): Δcompute série entre 20k e 200k = 54,37 s; Δparalelo = 12,63 s → **w_eff ≈ 4,31×**. Decomposição alternativa (custo fixo ≈ 2,82 s estimado do par 200 yr; startup ≈ 5,2-5,6 s) → ≈ 4,62×. **w_eff ≈ 4,3-4,6× = 54-58% de eficiência vs 8× ideal** — consistente com 4 núcleos físicos + HT (whfast é single-thread por processo; 8 processos em 4c/8t ⇒ agregado ≈ 4 núcleos × ganho de HT).
+- Integridade: `ranking.csv` e `ranking_summary.json` **byte-idênticos** entre a run série e a paralela (contrato determinístico OK); 8 candidatos em ambas; 0 falhas numéricas.
+- **EXTRAPOLAÇÃO (declarada como extrapolação, não garantia):** 122,0 h série (8 pares × 15,251 h) ÷ w_eff 4,3-4,6 → **~26,5-28,4 h de parede** para a Tarefa C com `--max-workers 8` (piso conservador w=4,0 → 30,5 h). O ingênuo "122/8 = 15,25 h" exigiria aceleração 8× real — impossível em 4 núcleos físicos. Startup (~5,6 s) é irrelevante nessa escala.
+- Limitações da extrapolação: horizonte 20.000× menor que 4 Gyr (2×10⁵ → 4×10⁹ anos); comportamento de I/O de checkpoint em horizonte de 4 Gyr não testado (pode pesar diferente); throttling térmico em ~28 h contínuas não testado; premissa de custo igual por candidato (mesmo nº de passos por branch — verdadeiro, horizonte/timestep idênticos).
+- RAM: pico **373,5 MB** total (8 workers + pai) — memória NÃO é restrição para a Tarefa C nesta máquina.
+- Conclusão para a decisão do Auditor: nesta máquina, Tarefa C ≈ **26-30 h de parede** com `--max-workers 8` (vs 122 h série); `medium.yaml` não serve para medir scaling (regime dominado por startup do pool).
+- Gate: pytest **198 passed** (108,69 s); ruff **All checks passed!**
+- PC: LURIAT
