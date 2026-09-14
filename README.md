@@ -29,8 +29,15 @@ python -m pytest        # suíte de testes completa
 
 ## 1. Fluxo do dia a dia
 
+**Fluxo recomendado: use a interface gráfica (dashboard) em vez dos comandos
+manuais.** Dois cliques em `abrir_dashboard.bat` (na raiz) sobem o servidor e
+abrem o navegador em **http://127.0.0.1:8765** — de lá dá para ver runs,
+relatórios, progresso e disparar comandos sem digitar nada. Passo a passo em
+`SETUP_DO_ZERO.md` (seção 9).
+
 | Quero...                                          | Comando |
 |-----------------------------------------------------|---------|
+| Abrir o dashboard (interface gráfica, recomendado) | dois cliques em `abrir_dashboard.bat` — ou `.venv\Scripts\Activate.ps1` + `python -m dashboard` → http://127.0.0.1:8765 |
 | Ver se o ambiente está OK                            | `python main.py doctor` |
 | Testar o pipeline rápido (sem física real, segundos)  | `python main.py smoke` |
 | Ver o que uma run *faria*, sem rodar de verdade       | `python main.py plan --budget configs/budgets/low.yaml` |
@@ -94,7 +101,7 @@ usado, então se estiver em dúvida sobre uma run já feita, olhe lá.
 |---|---|---|
 | `low.yaml` | 50 | teste rápido de que o pipeline roda |
 | `medium.yaml` | 200 | teste um pouco mais longo |
-| `secular.yaml` | 1e8 (ponto de partida - ver `docs/LIMITACOES.md`) | o único com validade científica para o artigo; usa checkpointing |
+| `secular.yaml` | 4e9 = 4 Gyr (meta do horizonte; custos reais medidos em `docs/LIMITACOES.md` e `results/hardware_benchmark.json`) | o único com validade científica para o artigo; usa checkpointing |
 | `serious.yaml` | 50.000 (via aliases legados `screen_t_myr` etc.) | budget usado pelos testes de robustez V2 (leave-one-out, modelos nulos); `null_model_integration_years` separado para o sub-orçamento dos nulos |
 | `montecarlo_stage2.yaml` | 1e6 | usado internamente pelo `montecarlo-scan`, não rode direto |
 

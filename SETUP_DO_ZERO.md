@@ -36,7 +36,7 @@ git config --global user.email "seu-email@dominio.com"
 
 ```powershell
 cd C:\Users\SEU_USUARIO\Downloads
-git clone https://github.com/lIIuriat/planet9-screening-lab.git
+git clone https://github.com/llLuriat/planet9-screening-lab.git
 cd planet9-screening-lab
 ```
 
@@ -97,7 +97,7 @@ instalar — resolve antes de continuar.
 python -m pytest tests/ -q
 ```
 
-Esperado: `96 passed`.
+Esperado: `198 passed`.
 
 Confirma que os testes não sujaram a pasta `runs/` real do projeto:
 ```powershell
@@ -113,7 +113,7 @@ Deve voltar **vazio**. Se voltar algo, pare e avise antes de continuar.
 ruff check .
 ```
 
-Esperado: 6 avisos, todos já conhecidos e justificados (não são bugs).
+Esperado: `All checks passed!` (a suíte atual passa limpa, sem avisos).
 
 ---
 
@@ -166,7 +166,39 @@ dormir.
 
 ---
 
-## 9. Auditar e conferir a run
+## 9. Dashboard — interface gráfica (fluxo recomendado pro dia a dia)
+
+O dia a dia do projeto agora é pela interface gráfica, não por comandos
+manuais do terminal.
+
+**Mais simples:** dê dois cliques em **`abrir_dashboard.bat`** na raiz do
+projeto. Uma janela de terminal abre (é o servidor — deixe-a aberta enquanto
+usa) e o navegador abre sozinho em:
+
+> **http://127.0.0.1:8765**
+
+Se a página abrir antes do servidor terminar de subir (~15 s), basta
+atualizar (F5).
+
+**Manual (alternativo):**
+```powershell
+.venv\Scripts\Activate.ps1
+python -m dashboard
+```
+O console mostra `NiceGUI ready to go on http://127.0.0.1:8765` quando o
+servidor está no ar. O bind é exclusivo em 127.0.0.1 — nada fica exposto na
+rede.
+
+**Para parar:** feche a janela do terminal (ou Ctrl+C nela). Nada em `runs/`
+é afetado — o dashboard só lê os artefatos e dispara jobs detached (runs
+longas sobrevivem ao fechamento da UI).
+
+Telas: `/` (lista de runs), `/run/<id>` (relatório + progresso ao vivo),
+`/launch` (disparar comandos sem digitar nada), `/jobs` (jobs disparados).
+
+---
+
+## 10. Auditar e conferir a run
 
 ```powershell
 python main.py status
@@ -177,7 +209,7 @@ Esperado: `AUDIT OK`.
 
 ---
 
-## 10. Commit e push
+## 11. Commit e push
 
 ```powershell
 git status --porcelain runs/    # confere o que vai entrar (deve seguir vazio, salvo se você decidiu manter algo de propósito)
@@ -220,7 +252,7 @@ git remote -v
 Se estiver errado:
 ```powershell
 git remote remove origin
-git remote add origin https://github.com/lIIuriat/planet9-screening-lab.git
+git remote add origin https://github.com/llLuriat/planet9-screening-lab.git
 ```
 
 **`.venv` aparecendo no `git status`/`git add`**

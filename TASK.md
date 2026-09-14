@@ -679,3 +679,21 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
 - Conclusão para a decisão do Auditor: nesta máquina, Tarefa C ≈ **26-30 h de parede** com `--max-workers 8` (vs 122 h série); `medium.yaml` não serve para medir scaling (regime dominado por startup do pool).
 - Gate: pytest **198 passed** (108,69 s); ruff **All checks passed!**
 - PC: LURIAT
+
+## 2026-09-13 — Cline (Executor) — Sincronização + SETUP_DO_ZERO.md atualizado + dashboard validado ao vivo (fluxo recomendado)
+- Contexto: pedido do Auditor (PC LURIAT) em 3 partes — sincronização, docs de setup, validação PRÁTICA do dashboard (o Auditor nunca tinha conseguido acessá-lo).
+- **Parte 1 — Sincronização:** `git fetch` → sync `0 0` (local = origin = `56ad9e4`); árvore limpa (nada untracked/modified); venv OK (`pyvenv.cfg` → Python 3.11.9 em `C:\Users\lucas\...\Python311`, base confirmada existente via Test-Path True — nada a corrigir). Gate inicial: pytest **198 passed** (117,13 s); ruff **All checks passed!**
+- **Parte 2 — Divergências encontradas e corrigidas nos docs raiz:**
+  - `SETUP_DO_ZERO.md` §5: "Esperado: `96 passed`" → **198 passed** (número real da suíte).
+  - `SETUP_DO_ZERO.md` §6: "6 avisos conhecidos" → **`All checks passed!`** (suíte atual passa limpa).
+  - `SETUP_DO_ZERO.md` **nova seção 9 "Dashboard — interface gráfica (fluxo recomendado pro dia a dia)"**: dois cliques em `abrir_dashboard.bat` → servidor + navegador automático em http://127.0.0.1:8765; manual alternativo (`python -m dashboard`); como parar (fechar janela/Ctrl+C); telas. Seções 9→10 e 10→11 renumeradas.
+  - `SETUP_DO_ZERO.md` **URLs do remote corrigidas em 2 lugares (L39 clone e L255 troubleshooting): `lIIuriat` → `llLuriat`** — o remote real (git remote get-url) é `https://github.com/llLuriat/planet9-screening-lab.git`; um clone feito pelo texto antigo FALHARIA. Bug real de doc, não cosmético.
+  - `README.md` §1: dashboard adicionado como **primeira linha** da tabela + parágrafo "fluxo recomendado: UI em vez de comandos manuais" (pedido explícito do Auditor: abandonar comandos manuais do cli.py no dia a dia); §2: linha do `secular.yaml` na tabela de budgets corrigida de `1e8` (desatualizado) para **`4e9 = 4 Gyr`** (valor real do arquivo; custos medidos referenciados).
+  - Fora do escopo, SÓ REPORTADO: `configs/budgets/secular.yaml` tem comentário com números antigos do i5-14400 (~6,4h/par, ~25,6h/8) e mojibake (`â€"`) na linha do `integration_years` — a máquina real é a LURIAT (15,251 h/par; ver benchmark 9793b61). Fica para decisão do Auditor (tocar config fora do escopo declarado não é permitido).
+- **Parte 3 — Dashboard validado AO VIVO (evidência):** `python -m dashboard` subiu limpo: stdout "Dashboard em http://127.0.0.1:8765 (bind exclusivo em localhost; Ctrl+C para sair)" + "NiceGUI ready to go on http://127.0.0.1:8765". HTTP real (Invoke-WebRequest): GET `/` → **200** (16.785 bytes, título "Planet9 Screening Lab" presente), GET `/launch` → **200**, GET `/jobs` → **200**. Navegador padrão aberto de fato (Start-Process na URL) — o Auditor acessou a tela inicial nesta sessão.
+- **Padrão de processos (ops):** o pai `python -m dashboard` (PID 3984) sai após spawn e quem serve é o filho (PID 11712, cmdline confirmada `python -m dashboard`) — mesmo padrão já documentado na Tarefa D (L544, PIDs 2756/3220). Servidor DEIXADO RODANDO (localhost only) para uso imediato; para parar esta instância: `Stop-Process -Id 11712` (ou fechar a janela, no fluxo do .bat). `ui.run(reload=False, show=False)` confirmado no código (app.py L288-295).
+- **Novo arquivo:** `abrir_dashboard.bat` na raiz — dois cliques: valida `.venv`, sobe o servidor em primeiro plano (janela = servidor; fechar/Ctrl+C para) e abre o navegador após 12 s. Instrução de parada segura embutida na janela e no SETUP §9.
+- **Tarefa C: segue NÃO AUTORIZADA** — esta tarefa não tocou em nada científico (só docs de setup + atalho de UI).
+- Arquivos tocados: `SETUP_DO_ZERO.md`, `README.md`, `abrir_dashboard.bat` (novo), `TASK.md` (esta entrada).
+- Gate final: pytest **198 passed**; ruff **All checks passed!** (saídas literais no relatório ao Auditor).
+- PC: LURIAT
