@@ -320,3 +320,62 @@ def test_runner_launches_detached_cli_process_full_lifecycle():
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
     assert runner.tail(job_id) != "(job não encontrado)"
+
+
+# ---------------------------------------------------------------------------
+# redesign de UX (autorização do Auditor): helpers puros de estimativa de
+# tempo e mapa de tradução — nada aqui roda servidor nem toca cli.py.
+# ---------------------------------------------------------------------------
+
+
+def _write_benchmark(root, rate):
+    results = root / "results"
+    results.mkdir(exist_ok=True)
+    data = {}
+    if rate is not None:
+        data["simulated_years_per_second"] = rate
+    (results / "hardware_benchmark.json").write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_time_hint_uses_measured_rate_and_pair_math(tmp_path, monkeypatch):
+    """Estimativa = integration_years do YAML ÷ taxa medida × 2 (par com/sem
+    P9) — os MESMOS fatores de scripts/benchmark_integration_cost.py."""
+    budgets = tmp_path / "configs" / "budgets"
+    budgets.mkdir(parents=True)
+    (budgets / "secular.yaml").write_text("integration_years: 4000000000\n", encoding="utf-8")
+    _write_benchmark(tmp_path, 145708.8737)
+    monkeypatch.setattr(app_module, "REPO_ROOT", tmp_path)
+    text = app_module._time_hint_text("configs/budgets/secular.yaml")
+    assert "Horizonte de 4.000.000.000" in text
+    assert "15,3 h" in text  # branch = 7,63 h; par com/sem P9 = 15,25 h
+    assert "122 h" in text  # 8 candidatos em série
+    assert "single-core" in text
+
+
+def test_time_hint_without_benchmark_honestly_declares_it(tmp_path, monkeypatch):
+    budgets = tmp_path / "configs" / "budgets"
+    budgets.mkdir(parents=True)
+    (budgets / "secular.yaml").write_text("integration_years: 4000000000\n", encoding="utf-8")
+    _write_benchmark(tmp_path, None)  # JSON sem taxa medida
+    monkeypatch.setattr(app_module, "REPO_ROOT", tmp_path)
+    text = app_module._time_hint_text("configs/budgets/secular.yaml")
+    assert "Sem estimativa de tempo" in text
+    assert "benchmark_integration_cost.py" in text
+
+
+def test_time_hint_legacy_budget_without_integration_years(tmp_path, monkeypatch):
+    budgets = tmp_path / "configs" / "budgets"
+    budgets.mkdir(parents=True)
+    (budgets / "old.yaml").write_text("screen_t_myr: 0.05\n", encoding="utf-8")
+    _write_benchmark(tmp_path, 145708.8737)
+    monkeypatch.setattr(app_module, "REPO_ROOT", tmp_path)
+    text = app_module._time_hint_text("configs/budgets/old.yaml")
+    assert "integration_years" in text
+    assert "Horizonte" not in text
+
+
+def test_status_translation_map_covers_all_known_statuses():
+    for status in ("completed", "running", "failed", "invalid", "unknown"):
+        assert app_module._STATUS_PT.get(status) not in (None, status)
+    assert app_module._STATUS_PT["completed"] == "concluída"
+    assert app_module._STATUS_PT["running"] == "em execução"

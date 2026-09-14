@@ -697,3 +697,20 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
 - Arquivos tocados: `SETUP_DO_ZERO.md`, `README.md`, `abrir_dashboard.bat` (novo), `TASK.md` (esta entrada).
 - Gate final: pytest **198 passed**; ruff **All checks passed!** (saídas literais no relatório ao Auditor).
 - PC: LURIAT
+
+## 2026-09-14 (noite) — Cline (Executor) — Redesign de UX do dashboard (autorização do Auditor, prioridade sobre a Tarefa C)
+
+- PC: LURIAT
+- Escopo respeitado: só `dashboard/` + `tests/`; `cli.py`/`planet9lab/` intocados (o dashboard só chama e lê).
+- 4 telas redesignadas: navegação superior com a página ativa destacada; painel inteiro em modo escuro; 100% pt-BR (termos técnicos mantidos com descrição em português ao lado).
+- `/launch`: subcomandos agrupados em 4 categorias (Execução de runs / Utilidades e infraestrutura / Diagnósticos e auditoria / Robustez V2) em accordions; labels claro obrigatório/opcional; `--budget` com select dos 4 budgets + entrada livre.
+- Estimativa de tempo junto ao `--budget`: lê `integration_years` do YAML escolhido + taxa REAL medida de `results/hardware_benchmark.json` (145.708,9 anos/s nesta máquina); NUNCA inventa número — quando falta YAML ou medição, o hint diz honestamente que não há estimativa. Fator 2 do par com/sem P9 idêntico a `engine.run_control_pair` e ao benchmark (testado).
+- `/run/<id>`: DUAS barras de progresso explícitas — candidatos (done/total de status.json/heartbeat) e integração (t_years das séries de checkpoint ÷ integration_years) — + auto-refresh de 5 s e idade do heartbeat.
+- Bugs corrigidos durante a montagem: `report.render_report_html` → `render_run_report` (causava HTTP 500 no `/run` de runs antigas); duplicação de bloco no fechamento do `page_shell`; formato do hint alinhado ao contrato dos testes.
+- Limpeza: intermediários de montagem (`_p1.._p7.txt`, `_new_dashboard_app.py`) removidos; verificação byte-level: UTF-8 válido, zero mojibake nos arquivos tocados.
+- Testes: `tests/test_dashboard_ux.py` (novo, 5) + `tests/test_dashboard.py` (+4): matemática do fator 2, honestidade sem benchmark/sem integration_years, mapa de status pt-BR cobrindo todos os status conhecidos.
+- Gate: pytest **207 passed** (198 → 207, +9); ruff **All checks passed!**
+- Validação ao vivo: `/`, `/launch`, `/jobs`, `/run/<id>` (screen e montecarlo) → HTTP 200; dark mode, accordion e barras de progresso confirmados pelo conteúdo servido.
+- **Tarefa C: segue NÃO AUTORIZADA** (redesign é interface, não conteúdo científico; nenhum número/métrica mudou).
+- Arquivos tocados: `dashboard/app.py` (reescrito), `tests/test_dashboard.py` (+4 testes), `tests/test_dashboard_ux.py` (novo), `TASK.md` (esta entrada).
+
