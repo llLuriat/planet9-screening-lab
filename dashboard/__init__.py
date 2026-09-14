@@ -7,6 +7,8 @@ runs e dispara os subcomandos existentes via subprocess desacoplado.
 Módulos:
 - `config`: caminhos do estado local (`.dashboard/`) e defaults do servidor.
 - `commands`: schema dos subcomandos disparáveis pelo formulário.
+- `hardware`: defaults inteligentes (threads locais; nunca inventa número).
+- `artifacts`: empacotamento .zip de uma run concluída para download.
 - `runstore`: leitura read-only de `runs/` (status, blockers, progresso).
 - `report`: relatório HTML legível de uma run (caveats/interpretation
   verbatim — contrato travado por teste).

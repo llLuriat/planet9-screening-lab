@@ -34,6 +34,7 @@ Writes results/hardware_benchmark.json with:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import platform
@@ -75,7 +76,48 @@ def _physical_cores() -> int | None:
     return None
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """CLI deste script (o subcomando ``benchmark`` do cli.py delega para cá).
+
+    Os defaults reproduzem EXATAMENTE o comportamento histórico de
+    ``python scripts/benchmark_integration_cost.py`` sem argumentos.
+    """
+    parser = argparse.ArgumentParser(
+        prog="benchmark_integration_cost.py",
+        description=(
+            "Measure REBOUND integration throughput on THIS machine and write "
+            "results/hardware_benchmark.json."
+        ),
+    )
+    parser.add_argument(
+        "--budget",
+        default="configs/budgets/secular.yaml",
+        help="budget YAML whose timestep_years defines the benchmarked system",
+    )
+    parser.add_argument(
+        "--wall-clock-budget-hours",
+        type=float,
+        default=WALL_CLOCK_BUDGET_HOURS,
+        help=f"wall-clock budget per control pair (default: {WALL_CLOCK_BUDGET_HOURS})",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="destination JSON (default: results/hardware_benchmark.json, overwritten)",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
+    budget_path = Path(args.budget)
+    if not budget_path.is_absolute():
+        budget_path = ROOT / budget_path
+    wall_clock_budget_hours = float(args.wall_clock_budget_hours)
+    out_path = Path(args.output) if args.output else ROOT / "results" / "hardware_benchmark.json"
+    if not out_path.is_absolute():
+        out_path = ROOT / out_path
+
     try:
         import rebound
     except ImportError:
@@ -100,13 +142,13 @@ def main() -> None:
 
     giants = load_giants(ROOT / "data" / "solar_system" / "giants_epoch.csv")
     etnos = included_etnos(load_etnos(ROOT / "data" / "etnos" / "catalog.csv"))
-    budget = load_budget(ROOT / "configs" / "budgets" / "secular.yaml")
+    budget = load_budget(budget_path)
     candidates = load_candidates(ROOT / "data" / "candidates_example.csv")
 
     timestep_info = recommended_timestep_years(giants)
     if abs(timestep_info["recommended_timestep_years"] - budget.timestep_years) > 1e-4:
         print(
-            "WARNING: configs/budgets/secular.yaml timestep_years "
+            f"WARNING: {args.budget} timestep_years "
             f"({budget.timestep_years}) does not match the value derived from the "
             f"current giants catalog ({timestep_info['recommended_timestep_years']}). "
             "The catalog may have changed; re-derive the timestep before trusting "
@@ -116,7 +158,7 @@ def main() -> None:
 
     n_particles = 1 + len(giants) + 1 + len(etnos)  # sun + giants + P9 + ETNOs
     print(f"System size: {n_particles} particles ({len(giants)} giants, {len(etnos)} ETNOs, 1 P9 candidate)")
-    print(f"Timestep: {budget.timestep_years} yr (from secular.yaml)")
+    print(f"Timestep: {budget.timestep_years} yr (from {args.budget})")
 
     sim = rebound.Simulation()
     sim.units = ("yr", "AU", "Msun")
@@ -160,7 +202,7 @@ def main() -> None:
     recommended_years = None
     for horizon in sorted(CANDIDATE_HORIZONS_YEARS):
         hours_pair = projections[str(horizon)]["hours_per_candidate_control_pair"]
-        if hours_pair <= WALL_CLOCK_BUDGET_HOURS:
+        if hours_pair <= wall_clock_budget_hours:
             recommended_years = horizon
     result = {
         "measured_on": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -182,7 +224,7 @@ def main() -> None:
         "calibration_wall_seconds": round(elapsed, 4),
         "steps_per_second": round(steps_per_second, 2),
         "simulated_years_per_second": round(years_per_second, 4),
-        "wall_clock_budget_hours_per_candidate_pair": WALL_CLOCK_BUDGET_HOURS,
+        "wall_clock_budget_hours_per_candidate_pair": wall_clock_budget_hours,
         "projections_by_horizon_years": projections,
         "recommended_integration_years": recommended_years,
         "recommendation_note": (
@@ -193,14 +235,13 @@ def main() -> None:
             "sequentially multiplies this linearly (see hours_for_full_candidate_set)."
             if recommended_years is not None
             else "No tested horizon fits inside the configured wall-clock budget on "
-            "this machine. Either raise WALL_CLOCK_BUDGET_HOURS (accept a longer "
+            "this machine. Either raise --wall-clock-budget-hours (accept a longer "
             "run), reduce integration_years below 1e8, or reduce ETNO/candidate "
             "count. Do not silently keep 4e9 yr in secular.yaml if it is not "
             "actually reachable here."
         ),
     }
 
-    out_path = ROOT / "results" / "hardware_benchmark.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
     print(f"\nWrote {out_path}")

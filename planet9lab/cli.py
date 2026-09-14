@@ -153,6 +153,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     circular.add_argument("--from-run", required=True)
     circular.add_argument("--alpha", type=float, default=0.05, help="significance level for the side-by-side flags (default: 0.05)")
+
+    # Cost benchmarking (operational, not scientific): measures REBOUND
+    # throughput on THIS machine and writes a hardware_benchmark JSON. Dispatch
+    # delegates to scripts/benchmark_integration_cost.py (same pattern as
+    # status/watch -> scripts/watch_progress.py), so the script stays the single
+    # source of the benchmark arithmetic. Every flag below is forwarded to the
+    # script's own argparse (benchmark_integration_cost.build_parser) - the CLI
+    # never exposes an option the script does not honour. Defaults reproduce the
+    # historical no-argument invocation exactly.
+    benchmark = sub.add_parser(
+        "benchmark",
+        help="measure REBOUND integration throughput on THIS machine (writes results/hardware_benchmark.json)",
+    )
+    benchmark.add_argument(
+        "--budget",
+        default="configs/budgets/secular.yaml",
+        help="budget YAML whose timestep_years defines the benchmarked system (default: configs/budgets/secular.yaml)",
+    )
+    benchmark.add_argument(
+        "--wall-clock-budget-hours",
+        type=float,
+        default=None,
+        help="wall-clock budget per control pair used for recommended_integration_years (default: the script's 48.0)",
+    )
+    benchmark.add_argument(
+        "--output",
+        default=None,
+        help="destination JSON (default: results/hardware_benchmark.json, overwritten)",
+    )
     return parser
 
 
@@ -225,6 +254,20 @@ def main(argv: list[str] | None = None) -> int:
             run_dir = run_montecarlo_scan(args.config, args.seed, run_root=run_root, max_workers=args.max_workers)
             print(f"Monte Carlo scan created: {run_dir}")
             return 0
+        if args.command == "benchmark":
+            import subprocess
+            import sys as _sys
+            from pathlib import Path as _Path
+
+            # Same delegation pattern as status/watch: the script owns the
+            # arithmetic and the write to its JSON destination.
+            script = _Path(__file__).resolve().parent.parent / "scripts" / "benchmark_integration_cost.py"
+            cmd = [_sys.executable, str(script), "--budget", args.budget]
+            if args.wall_clock_budget_hours is not None:
+                cmd += ["--wall-clock-budget-hours", str(args.wall_clock_budget_hours)]
+            if args.output:
+                cmd += ["--output", args.output]
+            return subprocess.call(cmd)
         if args.command in ("status", "watch"):
             import subprocess
             import sys as _sys

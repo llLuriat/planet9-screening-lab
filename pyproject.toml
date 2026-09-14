@@ -12,6 +12,7 @@ dependencies = [
   "rich",
   "matplotlib",
   "pytest",
+  "pytest-asyncio",
   "ruff",
   "rebound",
   "nicegui",
@@ -21,6 +22,13 @@ dependencies = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+# pytest-asyncio (necessário para as fixtures async do nicegui.testing.User)
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# Arquivo "principal" da simulação de usuário (nicegui.testing.User):
+# wrapper que importa dashboard/app.py (rotas registram no import) e chama
+# ui.run() no nível do módulo, como a simulação exige (sem servidor real).
+main_file = "tests/nicegui_main.py"
 
 [tool.setuptools.packages.find]
 include = ["planet9lab*"]

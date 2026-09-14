@@ -278,6 +278,17 @@ COMMANDS: tuple[dict[str, Any], ...] = (
         "description": "Regera reports/report.md, com a seção de robustez V2 se presente.",
         "args": (_a("--from-run", "path_run", required=True, help="diretório da run"),),
     },
+    {
+        "name": "benchmark",
+        "group": "Benchmarks",
+        "long_running": False,
+        "description": "Mede a taxa de integração REBOUND DESTA máquina e SOBRESCREVE results/hardware_benchmark.json (o dashboard faz backup antes em .dashboard/backups/).",
+        "args": (
+            _a("--budget", "path", default="configs/budgets/secular.yaml", help="YAML cujo timestep/catalogos definem o sistema medido (default: secular.yaml)"),
+            _a("--wall-clock-budget-hours", "float", help="orcamento de horas por par com/sem P9 usado no recommended_integration_years (default do script: 48)"),
+            _a("--output", "path", help="JSON de destino (default: results/hardware_benchmark.json)"),
+        ),
+    },
 )
 
 # Nunca disparável pelo dashboard, mesmo se um dia entrar no schema

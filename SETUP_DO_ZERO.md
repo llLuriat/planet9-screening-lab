@@ -193,8 +193,11 @@ rede.
 é afetado — o dashboard só lê os artefatos e dispara jobs detached (runs
 longas sobrevivem ao fechamento da UI).
 
-Telas: `/` (lista de runs), `/run/<id>` (relatório + progresso ao vivo),
-`/launch` (disparar comandos sem digitar nada), `/jobs` (jobs disparados).
+Telas: `/` (Painel: triagem, comparação, Monte Carlo, benchmark e runs),
+`/run/<id>` (relatório + progresso ao vivo + botão "Baixar resultados"),
+`/testes` (diagnósticos e robustez, fora do fluxo principal),
+`/executar/<comando>` (formulário de um comando, já preenchido),
+`/jobs` (jobs disparados).
 
 ---
 

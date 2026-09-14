@@ -8,6 +8,12 @@ redirects data lookup and never pollutes runs/latest_run.txt in the repo.
 
 import pytest
 
+# Plugin do NiceGUI para a simulação de usuário (fixture ``user``):
+# fornece user/user_navigation etc. e lê a ini ``main_file`` (definida no
+# pyproject.toml como dashboard/app.py — as rotas do dashboard registram no
+# import; main() não é chamado).
+pytest_plugins = ["nicegui.testing.user_plugin"]
+
 
 @pytest.fixture(autouse=True)
 def isolated_runs(tmp_path, monkeypatch):

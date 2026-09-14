@@ -2,9 +2,13 @@
 
 Restrições da tarefa (intocáveis aqui):
 - servidor apenas em ``HOST`` = 127.0.0.1 (nunca 0.0.0.0/rede);
-- NUNCA altera ``cli.py``/``planet9lab/``: só chama os comandos existentes
-  via ``dashboard.runner`` (Popen detached — runs longas sobrevivem ao
-  fechamento da UI);
+- o dashboard NUNCA inventa subcomando nem flag: o formulário é gerado do
+  schema curado (``dashboard/commands.py``), verificado por teste contra o
+  argparse de ``cli.py`` (o subcomando ``benchmark`` foi ADICIONADO ao
+  cli.py sob autorização explícita do Auditor neste redesign, delegando ao
+  script ``scripts/benchmark_integration_cost.py``);
+- runs longas são lançadas via ``dashboard.runner`` (Popen detached —
+  sobrevivem ao fechamento da UI);
 - números/textos exibidos vêm dos artefatos via ``runstore``/``report``
   (caveats/interpretation verbatim, contrato do ``report.py``);
 - estimativas de tempo NUNCA são inventadas: vêm do
@@ -12,10 +16,18 @@ Restrições da tarefa (intocáveis aqui):
   medida em ``results/hardware_benchmark.json``; sem esses dois dados,
   o painel diz honestamente que não há estimativa.
 
-Redesign de UX (autorização do Auditor, antes da Tarefa C):
-- painel inteiro em modo escuro; navegação superior com a página ativa
-  destacada; 4 páginas (Runs, Disparar, Detalhe da run, Jobs);
-- na /launch, comandos agrupados por categoria funcional em accordions;
+Redesign de UX 2 (autorização do Auditor, antes da Tarefa C) — critério
+de aceite: uma pessoa que não fez o simulador consegue usar sem
+explicação prévia:
+- UMA tela principal (Painel, ``/``) com os 3 comandos científicos
+  principais como cartões em linguagem comum + benchmark + runs recentes;
+- aba ``/testes`` separada com os 19 comandos de diagnóstico/robustez/
+  utilidade (fora do fluxo principal);
+- explicações em TOOLTIP (hover), não em texto permanente;
+- formulários com defaults inteligentes já preenchidos
+  (``dashboard/hardware.py``), sobrescrevíveis;
+- run concluída ganha botão "Baixar resultados (zip)"
+  (``dashboard/artifacts.py``);
 - na página da run, DUAS barras de progresso explícitas: candidatos
   (done/total, de status.json/heartbeat.json) e integração (t_years das
   séries de checkpoint ÷ integration_years);
@@ -26,22 +38,23 @@ from __future__ import annotations
 
 import html
 import logging
+import shutil
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import yaml
 from nicegui import ui
 
-from dashboard import __version__, commands, report, runner, runstore
-from dashboard.config import DEFAULT_HOST, DEFAULT_PORT, DEFAULT_RUN_ROOT
+from dashboard import __version__, artifacts, commands, config, hardware, report, runner, runstore
+from dashboard.config import DEFAULT_HOST, DEFAULT_PORT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("dashboard")
 
 HOST = DEFAULT_HOST  # 127.0.0.1 — nunca 0.0.0.0 (regra não negociável)
 PORT = DEFAULT_PORT
-RUN_ROOT = DEFAULT_RUN_ROOT
 REPO_ROOT = commands.REPO_ROOT
 
 # ---------------------------------------------------------------------------
@@ -49,8 +62,8 @@ REPO_ROOT = commands.REPO_ROOT
 # ---------------------------------------------------------------------------
 
 _NAV_ITEMS = (
-    ("/", "Runs", "dashboard"),
-    ("/launch", "Disparar", "rocket_launch"),
+    ("/", "Painel", "dashboard"),
+    ("/testes", "Testes e diagnósticos", "science"),
     ("/jobs", "Jobs", "terminal"),
 )
 
@@ -71,28 +84,122 @@ _BADGE_COLOR = {
     "unknown": "grey",
 }
 
-# Ordem fixa das categorias na página de disparo (accordion). As chaves são
-# os valores de ``group`` do schema curado (dashboard/commands.py).
-_GROUP_ORDER: tuple[str, ...] = ("Runs", "Infra", "Diagnósticos", "Robustez V2")
+# ---------------------------------------------------------------------------
+# Taxonomia do redesign 2 (aprovada pelo Auditor). Toda a lista de comandos
+# do schema aparece em exatamente UM lugar da UI — travado por teste
+# (tests/test_dashboard_redesign.py): 5 ações no Painel + benchmark dedicado
+# + 19 comandos na aba /testes.
+# ---------------------------------------------------------------------------
 
-_GROUP_META: dict[str, dict[str, str]] = {
-    "Runs": {
-        "label": "Execução de runs",
-        "caption": "Screening, comparação, Monte Carlo, retomada e verificação do pipeline.",
-    },
-    "Infra": {
-        "label": "Utilidades e infraestrutura",
-        "caption": "Status das runs e verificação do ambiente de física.",
-    },
-    "Diagnósticos": {
-        "label": "Diagnósticos e auditoria",
-        "caption": "Investigação de runs existentes; não entram no funil de classificação.",
-    },
-    "Robustez V2": {
-        "label": "Robustez (V2)",
-        "caption": "Leave-one-out, modelos nulos, convergência, validação do topo e re-pontuação.",
-    },
+# (nome no schema, rótulo pt-BR em linguagem comum, ícone, tooltip/hover)
+_HOME_PRIMARY: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "screen",
+        "Rodar triagem de candidatos",
+        "travel_explore",
+        "Pipeline completo por candidato: integra o sistema com e sem o P9 "
+        "hipotético, aplica o modelo de viés do survey e ranqueia os "
+        "candidatos. Resultados possíveis: triagem exploratória, candidato "
+        "de interesse dentro do protocolo, nenhum candidato encontrado ou "
+        "inconclusivo — nunca uma confirmação.",
+    ),
+    (
+        "compare",
+        "Comparar candidato com/sem Planeta Nove",
+        "compare_arrows",
+        "Par de controle para UM candidato: integra o sistema duas vezes "
+        "(com P9 e sem P9) e compara o comportamento das órbitas dos ETNOs. "
+        "É a base física do ranking da triagem.",
+    ),
+    (
+        "montecarlo-scan",
+        "Varredura Monte Carlo",
+        "casino",
+        "Varredura Monte Carlo/QMC do espaço de parâmetros do P9 (pode "
+        "levar horas). Gera a distribuição de regiões compatíveis com os "
+        "ETNOs — triagem exploratória, não confirmação.",
+    ),
+)
+
+_HOME_SECONDARY: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "resume",
+        "Retomar run interrompida",
+        "restart_alt",
+        "Continua uma run interrompida de onde ela parou (usa os "
+        "checkpoints; candidatos já concluídos não são refeitos).",
+    ),
+    (
+        "report",
+        "Regenerar relatório de uma run",
+        "description",
+        "Reconstrói o relatório (reports/report.md) de uma run existente — "
+        "rápido, sem simulação.",
+    ),
+)
+
+_BENCHMARK_TOOLTIP = (
+    "Mede a taxa de integração REBOUND DESTA máquina (minutos) e atualiza "
+    "results/hardware_benchmark.json — fonte das estimativas de tempo do "
+    "painel. O arquivo anterior é copiado para .dashboard/backups/ antes de "
+    "ser sobrescrito. O número novo vale apenas para esta máquina "
+    "(provenance registrada no próprio arquivo)."
+)
+
+# Aba /testes: (título, legenda curta, comandos — todos existem no schema).
+_TESTS_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "Robustez",
+        "Leave-one-out, convergência, validação do topo, modelos nulos e re-pontuação.",
+        (
+            "leave-one-out",
+            "convergence",
+            "validate-top",
+            "null-models",
+            "rescore",
+            "diagnose-null-models",
+            "diagnose-scoring",
+        ),
+    ),
+    (
+        "Diagnóstico de candidatos e estatística",
+        "Investigação de candidatos e do clustering angular; não entram no funil de classificação.",
+        (
+            "explain-candidate",
+            "why-rejected",
+            "candidate-families",
+            "circular-stats",
+            "selection-bias-check",
+            "megno",
+        ),
+    ),
+    (
+        "Sanidade e utilidades do pipeline",
+        "Verificações rápidas do ambiente e do pipeline; úteis após mudanças.",
+        ("smoke", "plan", "init-data", "physics-check", "status", "audit-run"),
+    ),
+)
+
+_TESTS_TAB_META: dict[str, dict[str, str]] = {
+    "Robustez": {"icon": "shield"},
+    "Diagnóstico de candidatos e estatística": {"icon": "query_stats"},
+    "Sanidade e utilidades do pipeline": {"icon": "health_and_safety"},
 }
+
+_COMMAND_LABELS: dict[str, str] = {
+    **{name: label for name, label, _, _ in (*_HOME_PRIMARY, *_HOME_SECONDARY)},
+    "benchmark": "Rodar benchmark de hardware",
+}
+
+
+def _home_command_names() -> tuple[str, ...]:
+    """Nomes dos comandos expostos no Painel (cartões + benchmark)."""
+    return (*{name for name, *_ in (*_HOME_PRIMARY, *_HOME_SECONDARY)}, "benchmark")
+
+
+def _tests_command_names() -> tuple[str, ...]:
+    """Nomes dos comandos da aba /testes, na ordem dos grupos."""
+    return tuple(name for _, _, names in _TESTS_GROUPS for name in names)
 
 # Rótulos pt-BR dos budgets padrão (o valor continua sendo o caminho real).
 _BUDGET_OPTIONS: dict[str, str] = {
@@ -258,22 +365,52 @@ def _progress_cell(info: dict[str, Any]) -> str:
     return f"{_pt_num(pct, 0)}% ({done}/{int(total)} candidatos)"
 
 
-def _index_page() -> None:
+def _home_page() -> None:
     with page_shell("/"):
-        with ui.row().classes("w-full items-center justify-between"):
-            ui.label("Runs").classes("text-h5")
-            ui.button("Nova run", icon="add", on_click=lambda: ui.navigate.to("/launch"))
+        ui.label("O que você quer rodar?").classes("text-h5")
+        with ui.grid(columns=3).classes("w-full"):
+            for name, label, icon, tip in _HOME_PRIMARY:
+                with ui.card().classes("w-full"):
+                    card = ui.button(
+                        label,
+                        icon=icon,
+                        on_click=lambda _, n=name: ui.navigate.to(f"/executar/{n}"),
+                    )
+                    card.props("flat align=left").classes("w-full")
+                    card.tooltip(tip)
+                    card.mark(f"home-{name}")
+        with ui.row().classes("w-full items-center gap-1 flex-wrap"):
+            ui.label("Operações sobre runs existentes:").classes("text-caption text-grey-5")
+            for name, label, icon, tip in _HOME_SECONDARY:
+                button = ui.button(
+                    label,
+                    icon=icon,
+                    on_click=lambda _, n=name: ui.navigate.to(f"/executar/{n}"),
+                )
+                button.props("flat")
+                button.tooltip(tip)
+                button.mark(f"home-{name}")
+        benchmark = ui.button(
+            "Rodar benchmark de hardware",
+            icon="speed",
+            on_click=lambda: ui.navigate.to("/executar/benchmark"),
+        )
+        benchmark.props("flat")
+        benchmark.tooltip(_BENCHMARK_TOOLTIP)
+        benchmark.mark("home-benchmark")
+        ui.separator()
+        ui.label("Runs").classes("text-h6")
         ui.label(
             "Cada linha é uma run em runs/. Clique na linha para abrir o relatório, "
             "bloqueadores e progresso detalhado."
         ).classes("text-caption text-grey-6")
-        runs = runstore.list_runs(RUN_ROOT)
+        runs = runstore.list_runs(config.run_root())
         if not runs:
             with ui.card():
                 ui.label("Nenhuma run encontrada em runs/.")
                 ui.label(
-                    "Dispare a primeira em “Disparar” (comece pelo budget low ou medium, "
-                    "que levam segundos/minutos)."
+                    "Clique num dos cartões acima para disparar a primeira "
+                    "(budget low ou medium levam segundos/minutos)."
                 ).classes("text-caption text-grey-6")
             return
         columns = [
@@ -341,8 +478,42 @@ def _progress_bar(label: str, pct: float | None, caption: str) -> None:
         ui.label(caption).classes("text-caption text-grey-6")
 
 
+def _do_download(run_dir: Path) -> None:
+    """Gera o .zip dos artefatos canônicos e dispara o download.
+
+    ``ui.download.content`` (bytes) funciona igual no navegador real e na
+    simulação de usuário dos testes. O zip também é persistido em
+    ``.dashboard/downloads/`` para inspeção posterior (o download do
+    navegador NÃO é a única cópia).
+    """
+    try:
+        zip_path = artifacts.build_results_zip(run_dir)
+    except OSError as exc:
+        ui.notify(f"Falha ao gerar o zip: {exc}", type="negative")
+        return
+    data = zip_path.read_bytes()
+    ui.download.content(data, filename=zip_path.name, media_type="application/zip")
+
+
+def _backup_benchmark() -> Path | None:
+    """Copia results/hardware_benchmark.json para .dashboard/backups/.
+
+    O subcomando ``benchmark`` SOBRESCREVE esse arquivo com a medição DESTA
+    máquina; o backup preserva o número rastreado anterior (que pode ser a
+    medição de outra máquina, como a LURIAT) para o histórico do Auditor.
+    Estado gitignored do dashboard — nada é escrito dentro de results/.
+    """
+    source = REPO_ROOT / "results" / "hardware_benchmark.json"
+    if not source.is_file():
+        return None
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dest = config.backups_dir() / f"hardware_benchmark_{stamp}.json"
+    shutil.copy2(source, dest)
+    return dest
+
+
 def _detail_page(run_id: str) -> None:
-    run_dir = runstore.resolve_run(RUN_ROOT, run_id)
+    run_dir = runstore.resolve_run(config.run_root(), run_id)
     if run_dir is None:
         with page_shell(f"/run/{run_id}"):
             ui.label(f"Run “{run_id}” não encontrada em runs/.")
@@ -357,6 +528,21 @@ def _detail_page(run_id: str) -> None:
             status = runstore.lifecycle_status(run_dir)
             with ui.row().classes("items-center gap-2"):
                 _badge_pt(status)
+                if status == "completed":
+                    download = ui.button(
+                        "Baixar resultados (zip)",
+                        icon="download",
+                        on_click=lambda run_dir=run_dir: _do_download(run_dir),
+                    )
+                    download.tooltip(
+                        "Gera um .zip com os artefatos de auditoria desta run: "
+                        "status/config/manifestos/hashes, events.log, results/, audit/, "
+                        "reports/, presentation/, diagnostics/, o relatório HTML e um "
+                        "MANIFESTO.txt. Fica de fora (decisão documentada): checkpoints "
+                        "pesados da integração secular, cache volátil de candidatos e "
+                        "locks. Os arquivos canônicos continuam em runs/."
+                    )
+                    download.mark("download-results")
                 ui.button(
                     "Atualizar", icon="refresh", on_click=lambda: ui.navigate.to(f"/run/{run_id}")
                 )
@@ -427,40 +613,88 @@ def _detail_page(run_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _initial_value(arg: dict[str, Any], run_options: list[str]) -> Any:
+    """Valor inicial do campo: default inteligente JÁ PREENCHIDO.
+
+    Regra do redesign (aprovada pelo Auditor): todo campo com um valor
+    óbvio e verificável nasce preenchido — o usuário só sobrescreve se
+    quiser. Nada aqui inventa número:
+    - ``--max-workers`` → threads lógicas reais desta máquina
+      (dashboard/hardware.py; o benchmark do repo só é citado no tooltip,
+      com o aviso explícito quando foi medido em OUTRA máquina);
+    - ``--run-root`` → ``runs`` (o diretório canônico do projeto);
+    - ``--budget`` → ``low`` (evita que um clique descuidado dispare o
+      horizonte de 4 Gyr, que leva dias; o hint ao lado mostra o custo);
+    - demais defaults (seed, top, alpha, --config) vêm do schema espelhado
+      do cli.py; campos sem default nascem vazios de propósito.
+    """
+    flag, kind = arg["flag"], arg["kind"]
+    if kind == "path_run":
+        return run_options[0] if run_options else None
+    if flag == "--budget":
+        return "configs/budgets/low.yaml"
+    if flag == "--run-root":
+        return hardware.suggest_run_root()
+    if flag == "--max-workers":
+        return hardware.suggest_max_workers()
+    return arg.get("default")
+
+
 def _make_field(arg: dict[str, Any], run_options: list[str]) -> Any:
-    """Widget do formulário para um argumento, com tooltip do help."""
+    """Widget do formulário para um argumento.
+
+    Explicações estáticas vão em TOOLTIP (requisito do redesign: nenhum
+    texto permanente explicativo); hints DINÂMICOS (estimativa de tempo do
+    budget) continuam como label mutável ao lado do campo.
+    """
     flag, kind = arg["flag"], arg["kind"]
     label = f"{flag} {'*' if arg['required'] else ''}"
+    initial = _initial_value(arg, run_options)
     if kind == "path_run":
-        initial = run_options[0] if (run_options and arg["required"]) else None
-        select = ui.select(
+        widget = ui.select(
             run_options, with_input=True, new_value_mode="add", label=label, value=initial
         ).classes("w-full")
-        select.tooltip("Escolha uma run existente de runs/ ou digite o nome.")
-        return select
-    if kind == "path" and flag == "--budget":
-        initial = "configs/budgets/medium.yaml" if not arg["required"] else None
-        return ui.select(
+        widget.tooltip(
+            str(arg["help"]) if arg["help"] else "Escolha uma run existente de runs/ ou digite o nome."
+        )
+    elif kind == "path" and flag == "--budget":
+        widget = ui.select(
             list(_BUDGET_OPTIONS.keys()),
             with_input=True,
             new_value_mode="add",
             label=label,
             value=initial,
         ).classes("w-full")
-    if kind == "flag":
-        return ui.switch(label).classes("w-full")
-    if kind == "int":
-        return ui.number(label, format="%.0f", precision=0).classes("w-full")
-    if kind == "float":
-        return ui.number(label).classes("w-full")
-    return ui.input(label).classes("w-full")
+        widget.tooltip(str(arg["help"]))
+    elif kind == "flag":
+        widget = ui.switch(label).classes("w-full")
+        if arg["help"]:
+            widget.tooltip(str(arg["help"]))
+    elif kind == "int":
+        widget = ui.number(label, format="%.0f", precision=0, value=initial).classes("w-full")
+        widget.tooltip(hardware.max_workers_hint() if flag == "--max-workers" else str(arg["help"]))
+    elif kind == "float":
+        widget = ui.number(label, value=initial).classes("w-full")
+        if arg["help"]:
+            widget.tooltip(str(arg["help"]))
+    else:
+        widget = ui.input(label, value=initial).classes("w-full")
+        if arg["help"]:
+            widget.tooltip(str(arg["help"]))
+    widget.mark(f"arg{flag}")
+    return widget
 
 
-def _launch_form(cmd: dict[str, Any], output: Any) -> None:
-    """Formulário de UM comando: obrigatórios antes dos opcionais + hint."""
+def _launch_form(cmd: dict[str, Any], output: Any, run_options: list[str] | None = None) -> None:
+    """Formulário de UM comando: obrigatórios antes dos opcionais + hint.
+
+    Explicações estáticas ficam nos TOOLTIPS dos campos; só o hint dinâmico
+    do ``--budget`` (estimativa medida) permanece visível como label.
+    """
     name = cmd["name"]
     fields: dict[str, Any] = {}
-    run_options = [info["run_id"] for info in runstore.list_runs(RUN_ROOT)]
+    if run_options is None:
+        run_options = [info["run_id"] for info in runstore.list_runs(config.run_root())]
 
     with ui.column().classes("w-full gap-2"):
         for section_label, args in (
@@ -474,22 +708,20 @@ def _launch_form(cmd: dict[str, Any], output: Any) -> None:
                 for arg in args:
                     with ui.column().classes("gap-0 w-full"):
                         fields[arg["flag"]] = _make_field(arg, run_options)
-                        if arg["help"]:
-                            ui.label(arg["help"]).classes("text-caption text-grey-6")
-                            if arg["kind"] == "path" and arg["flag"] == "--budget":
-                                budget_widget = fields[arg["flag"]]
-                                hint = ui.label(_time_hint_text(budget_widget.value)).classes(
-                                    "text-caption text-grey-5"
-                                )
+                        if arg["kind"] == "path" and arg["flag"] == "--budget":
+                            budget_widget = fields[arg["flag"]]
+                            hint = ui.label(_time_hint_text(budget_widget.value)).classes(
+                                "text-caption text-grey-5"
+                            )
 
-                                def _update_hint(
-                                    _change: Any,
-                                    budget_widget: Any = budget_widget,
-                                    hint: Any = hint,
-                                ) -> None:
-                                    hint.set_text(_time_hint_text(budget_widget.value))
+                            def _update_hint(
+                                _change: Any,
+                                budget_widget: Any = budget_widget,
+                                hint: Any = hint,
+                            ) -> None:
+                                hint.set_text(_time_hint_text(budget_widget.value))
 
-                                budget_widget.on_value_change(_update_hint)
+                            budget_widget.on_value_change(_update_hint)
 
     ui.separator()
     with ui.row().classes("w-full items-center gap-4"):
@@ -500,6 +732,7 @@ def _launch_form(cmd: dict[str, Any], output: Any) -> None:
                 name, cmd, fields, output
             ),
         )
+        launch_button.mark(f"executar-{name}")
         if cmd.get("long_running"):
             launch_button.props("color=primary")
             ui.label(
@@ -530,6 +763,10 @@ def _do_launch(name: str, cmd: dict[str, Any], fields: dict[str, Any], output: A
     if problems:
         output.push("ERRO de validação: " + "; ".join(problems))
         return
+    if name == "benchmark":
+        backup = _backup_benchmark()
+        if backup is not None:
+            output.push(f"backup do benchmark anterior salvo em: {backup}")
     try:
         record = runner.launch(name, values)
     except ValueError as exc:
@@ -538,28 +775,22 @@ def _do_launch(name: str, cmd: dict[str, Any], fields: dict[str, Any], output: A
     output.push(f"lançado {record['job_id']} → PID {record['pid']}: {' '.join(record['cmd'])}")
 
 
-def _launch_page() -> None:
-    with page_shell("/launch"):
-        ui.label("Disparar comando").classes("text-h5")
+def _tests_page() -> None:
+    with page_shell("/testes"):
+        ui.label("Testes e diagnósticos").classes("text-h5")
         ui.label(
-            "Todos os comandos do cli.py, agrupados por função. O dashboard nunca "
-            "inventa flags: o formulário é gerado do mesmo schema verificado por "
-            "teste contra o argparse do cli.py. O tempo estimado junto ao campo "
-            "--budget vem da medição REAL desta máquina "
-            "(results/hardware_benchmark.json)."
+            "Verificações de robustez, diagnóstico de candidatos e utilidades do "
+            "pipeline — não fazem parte do fluxo principal de triagem. As "
+            "explicações aparecem ao passar o mouse (tooltip) sobre cada comando "
+            "e campo."
         ).classes("text-caption text-grey-6")
         output = ui.log(max_lines=100).classes("w-full h-24")
-        grouped: dict[str, list[dict[str, Any]]] = {}
-        for cmd in commands.COMMANDS:
-            grouped.setdefault(str(cmd.get("group") or "Outros"), []).append(cmd)
-        group_order = _GROUP_ORDER + tuple(g for g in grouped if g not in _GROUP_ORDER)
-        for group in group_order:
-            cmds = grouped.get(group)
-            if not cmds:
-                continue
-            meta = _GROUP_META.get(group, {"label": group, "caption": ""})
+        run_options = [info["run_id"] for info in runstore.list_runs(config.run_root())]
+        for group_title, caption, names in _TESTS_GROUPS:
+            cmds = [commands.get_command(n) for n in names]
+            meta = _TESTS_TAB_META[group_title]
             with ui.expansion(
-                f"{meta['label']} ({len(cmds)})", caption=meta["caption"], icon="folder"
+                f"{group_title} ({len(cmds)})", caption=caption, icon=meta["icon"]
             ).classes("w-full"):
                 for cmd in cmds:
                     with ui.expansion(
@@ -567,7 +798,32 @@ def _launch_page() -> None:
                         caption=str(cmd.get("description") or ""),
                         icon="chevron_right",
                     ).classes("w-full"):
-                        _launch_form(cmd, output)
+                        _launch_form(cmd, output, run_options)
+
+
+def _executar_page(name: str) -> None:
+    """Página de formulário de UM comando (destino dos cartões do Painel).
+
+    Máximo de 2 cliques desde o Painel: cartão → formulário já preenchido →
+    botão Executar (o 2º clique dispara).
+    """
+    try:
+        cmd = commands.get_command(name)
+    except ValueError:
+        with page_shell(f"/executar/{name}"):
+            ui.label(f"Comando “{name}” não existe no schema do dashboard.")
+            ui.link("← voltar para o Painel", "/")
+        return
+    label = _COMMAND_LABELS.get(name, name)
+    with page_shell(f"/executar/{name}"):
+        ui.label(label).classes("text-h5")
+        ui.label(
+            "Formulário gerado do schema curado (mesmos flags do cli.py, "
+            "verificado por teste). Campos óbvios já vêm preenchidos; as "
+            "explicações estão nos tooltips de cada campo."
+        ).classes("text-caption text-grey-6")
+        output = ui.log(max_lines=100).classes("w-full h-24")
+        _launch_form(cmd, output)
 
 
 # ---------------------------------------------------------------------------
@@ -630,7 +886,7 @@ def _jobs_page() -> None:
 
 @ui.page("/")
 def index() -> None:
-    _index_page()
+    _home_page()
 
 
 @ui.page("/run/{run_id}")
@@ -638,9 +894,14 @@ def run_detail(run_id: str) -> None:
     _detail_page(run_id)
 
 
-@ui.page("/launch")
-def launch_page() -> None:
-    _launch_page()
+@ui.page("/testes")
+def tests_page() -> None:
+    _tests_page()
+
+
+@ui.page("/executar/{name}")
+def executar_page(name: str) -> None:
+    _executar_page(name)
 
 
 @ui.page("/jobs")
