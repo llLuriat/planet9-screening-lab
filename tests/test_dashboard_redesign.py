@@ -18,6 +18,7 @@ import asyncio
 import io
 import time
 import zipfile
+from pathlib import Path
 
 from dashboard import app as app_module
 from dashboard import commands, config, hardware
@@ -176,3 +177,83 @@ async def test_full_flow_launch_smoke_then_download_zip(user, tmp_path, monkeypa
     # O zip também é persistido no estado próprio do dashboard.
     assert (config.DOWNLOADS_DIR / f"{smoke_dir.name}.zip").is_file()
 
+# ---------------------------------------------------------------------------
+# Correções dos bugs visuais de 2026-09-14 (evidência: screenshot de
+# /run/smoke_...): CSS do relatório removido pelo sanitizador client-side
+# e resultado de benchmark inacessível em Jobs.
+# ---------------------------------------------------------------------------
+
+
+def _fake_run_minimo(root: Path) -> Path:
+    run_dir = root / "screen_20260101T000000000000Z"
+    (run_dir / "results").mkdir(parents=True)
+    (run_dir / "diagnostics").mkdir()
+    (run_dir / "status.json").write_text(
+        '{"status": "completed", "candidates_done": 1, "candidates_total": 2}',
+        encoding="utf-8",
+    )
+    (run_dir / "results" / "ranking.csv").write_text(
+        "candidate_id,score,verdict\nCAND-001,0.91,weak\n", encoding="utf-8"
+    )
+    return run_dir
+
+
+def test_run_report_fragment_has_no_style_tag_and_wraps_tables(tmp_path):
+    """<style> dentro de ui.html é removido pelo DOMPurify (sanitizador
+    client-side) — o fragmento da UI não pode contê-lo; o CSS vai no
+    <head> via REPORT_CSS (escopado em .p9-report) e as tabelas ficam em
+    .table-wrap (scroll horizontal próprio). O doc standalone (zip de
+    download) continua self-contained, com o CSS embutido."""
+    from dashboard import report
+
+    run_dir = _fake_run_minimo(tmp_path)
+    fragment = report.render_run_report_fragment(run_dir)
+    assert "<style" not in fragment
+    assert 'class="p9-report"' in fragment
+    assert 'class="table-wrap"' in fragment
+    assert 'data-verbatim="candidate_progress"' in fragment
+    doc = report.render_run_report(run_dir)
+    assert "<style>" in doc
+    assert "p9-report" in doc
+    assert report.REPORT_CSS.startswith(".p9-report")
+
+
+async def test_run_page_uses_fragment(user, tmp_path, monkeypatch):
+    """A página /run injeta o fragmento (marcado) e abre sem erro — o
+    relatório renderiza DENTRO da página Quasar, formatado pelo CSS do
+    head, sem substituir o tema da página."""
+    run_root = tmp_path / "runs"
+    run_root.mkdir()
+    monkeypatch.setenv(config.RUN_ROOT_ENV, str(run_root))
+    run_dir = _fake_run_minimo(run_root)
+    await user.open(f"/run/{run_dir.name}")
+    await user.should_see("Relatório da run")
+    await user.should_see("Resultados")
+    assert user.find(marker="run-report-fragment") is not None
+
+
+async def test_benchmark_job_result_is_viewable_in_jobs(user, tmp_path):
+    """BUG 2: benchmark não é run de screening — o resultado (JSON) tem de
+    ser visível a partir de Jobs, sem tentar aplicar o template científico.
+    Dispara um benchmark REAL desacoplado com --output temporário."""
+    from dashboard import runner
+
+    output = tmp_path / "bench_result.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text("", encoding="utf-8")  # schema exige caminho existente
+    record = runner.launch(
+        "benchmark",
+        {"--budget": "configs/budgets/low.yaml", "--output": str(output)},
+    )
+    deadline = time.time() + 180
+    while time.time() < deadline and not runner.read_job(record["job_id"]).get(
+        "finished"
+    ):
+        await asyncio.sleep(0.5)
+    assert output.is_file(), "benchmark não escreveu o resultado no --output"
+
+    await user.open("/jobs")
+    await user.should_see("Resultados de benchmark")
+    user.find(marker=f"benchmark-result-{record['job_id']}").click()
+    await user.should_see(f"Resultado do benchmark — job {record['job_id']}")
+    await user.should_see("simulated_years_per_second")

@@ -37,6 +37,7 @@ explicação prévia:
 from __future__ import annotations
 
 import html
+import json
 import logging
 import shutil
 from contextlib import contextmanager
@@ -398,6 +399,25 @@ def _home_page() -> None:
         benchmark.props("flat")
         benchmark.tooltip(_BENCHMARK_TOOLTIP)
         benchmark.mark("home-benchmark")
+        _bm = hardware.benchmark_summary()
+        if _bm["present"]:
+            _rate = _bm["simulated_years_per_second"]
+            _rate_txt = _pt_num(float(_rate)) if isinstance(_rate, (int, float)) else "?"
+            _onde = (
+                "nesta máquina"
+                if _bm["matches_this_machine"]
+                else "em OUTRA máquina — re-meça aqui antes de planejar horizontes"
+            )
+            ui.label(
+                f"Último benchmark: {_rate_txt} anos/s simulados ({_onde}; medido em "
+                f"{_bm['measured_on']}). Resultado completo em "
+                "results/hardware_benchmark.json — botão 'Ver resultado' em Jobs."
+            ).classes("text-caption text-grey-6").mark("home-benchmark-summary")
+        else:
+            ui.label(
+                "Sem benchmark medido ainda: rode o benchmark — o resultado "
+                "aparece aqui e em Jobs (botão 'Ver resultado')."
+            ).classes("text-caption text-grey-6").mark("home-benchmark-summary")
         ui.separator()
         ui.label("Runs").classes("text-h6")
         ui.label(
@@ -605,7 +625,14 @@ def _detail_page(run_id: str) -> None:
                 "Caveats e interpretações aparecem na ÍNTEGRA, sem reescrita "
                 "(contrato com report.py)."
             ).classes("text-caption text-grey-6")
-            ui.html(report.render_run_report(run_dir)).classes("w-full")
+            # CSS vai no <head> (ui.add_head_html): <style> dentro do ui.html
+            # é removido pelo sanitizador client-side (DOMPurify) — era a
+            # causa do relatório renderizar sem formatação nenhuma. O
+            # fragmento carrega só classes + data-verbatim (contrato igual).
+            ui.add_head_html(f"<style>{report.REPORT_CSS}</style>")
+            ui.html(report.render_run_report_fragment(run_dir)).classes("w-full").mark(
+                "run-report-fragment"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -831,16 +858,32 @@ def _executar_page(name: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _benchmark_output_path(polled: dict[str, Any]) -> str:
+    """Caminho do JSON de resultado de um job benchmark (default do CLI)."""
+    tokens = str(polled.get("command") or "").split()
+    if "--output" in tokens:
+        index = tokens.index("--output")
+        if index + 1 < len(tokens):
+            return tokens[index + 1]
+    return str(REPO_ROOT / "results" / "hardware_benchmark.json")
+
+
 def _jobs_page() -> None:
     with page_shell("/jobs"):
         ui.label("Jobs lançados pelo dashboard").classes("text-h5")
         ui.label(
             "Processos desacoplados: seguem rodando mesmo se você fechar esta "
-            "página (ou o dashboard). Clique numa linha para ver a cauda do log."
+            "página (ou o dashboard). Clique numa linha para ver a cauda do log. "
+            "Jobs de benchmark têm botão 'Ver resultado' — benchmark não é run "
+            "de screening: o resultado é um JSON (results/hardware_benchmark.json "
+            "ou o --output informado), não ranking.csv."
         ).classes("text-caption text-grey-6")
         rows = []
+        benchmark_jobs: list[tuple[str, str]] = []  # (job_id, caminho do JSON)
         for record in runner.list_jobs():
             polled = runner.poll(record["job_id"])
+            if "benchmark" in str(polled.get("command") or ""):
+                benchmark_jobs.append((polled["job_id"], _benchmark_output_path(polled)))
             rows.append(
                 {
                     "job_id": polled["job_id"],
@@ -877,6 +920,57 @@ def _jobs_page() -> None:
                 )
 
         table.on("rowClick", _show_log)
+
+        benchmark_container = ui.column().classes("w-full")
+
+        def _show_benchmark_result(job_id: str, path_text: str) -> None:
+            """Resultado de benchmark: resumo + JSON na ÍNTEGRA.
+
+            Benchmark não é run de screening (não tem results/ranking.csv nem
+            diagnostics/) — NUNCA aplicar o template de run científica a ele.
+            """
+            benchmark_container.clear()
+            with benchmark_container, ui.card().classes("w-full"):
+                ui.label(f"Resultado do benchmark — job {job_id}").classes("text-subtitle2")
+                resolved = Path(path_text)
+                if not resolved.is_absolute():
+                    resolved = REPO_ROOT / resolved
+                data = runstore.read_json(resolved)
+                if not data:
+                    ui.label(
+                        f"Nenhum resultado em {path_text} — o job ainda está "
+                        "rodando ou falhou (veja o log acima)."
+                    ).classes("text-caption text-grey-6")
+                    return
+                rate = data.get("simulated_years_per_second")
+                bits: list[str] = []
+                if isinstance(rate, (int, float)):
+                    bits.append(f"{_pt_num(float(rate))} anos simulados por segundo")
+                rec = data.get("recommended_integration_years")
+                if isinstance(rec, (int, float)):
+                    bits.append(f"horizonte recomendado: {_pt_num(float(rec), 0)} anos")
+                if bits:
+                    ui.label(" · ".join(bits)).classes("text-caption")
+                ui.code(
+                    json.dumps(data, ensure_ascii=False, sort_keys=True, indent=2),
+                    language="json",
+                ).classes("w-full")
+
+        if benchmark_jobs:
+            with ui.card().classes("w-full"):
+                ui.label("Resultados de benchmark").classes("text-subtitle2")
+                ui.label(
+                    "Benchmark mede o hardware DESTA máquina; não produz ranking "
+                    "nem diagnostics — o resultado é o JSON abaixo, na íntegra."
+                ).classes("text-caption text-grey-6")
+                for job_id, output_path in benchmark_jobs:
+                    ui.button(
+                        f"Ver resultado — job {job_id}",
+                        icon="insights",
+                        on_click=lambda _, jid=job_id, p=output_path: _show_benchmark_result(
+                            jid, p
+                        ),
+                    ).props("flat").mark(f"benchmark-result-{job_id}")
 
 
 # ---------------------------------------------------------------------------

@@ -25,25 +25,46 @@ from dashboard import runstore
 
 _MAX_TABLE_ROWS = 50
 
-_CSS = (
-    "body { font-family: system-ui, sans-serif; margin: 1.5rem; color: #ddd; background: #14181f; } "
-    "h1 { font-size: 1.4rem; } h2 { font-size: 1.15rem; margin-top: 1.6rem; "
+# CSS do relatório. Na UI é injetado no <head> via ui.add_head_html — NUNCA
+# dentro do fragmento do ui.html: o sanitizador client-side (DOMPurify)
+# remove a tag <style> e o relatório renderizaria SEM formatação nenhuma
+# (títulos gigantes, JSON cru, tabelas vazando — bug corrigido em 2026-09-14).
+# Regras ESCOPADAS em .p9-report para não vazar estilo ao resto da página.
+REPORT_CSS = (
+    ".p9-report { color: #ddd; font-size: .95rem; } "
+    ".p9-report h2 { font-size: 1.05rem; margin: 1.2rem 0 .4rem; "
     "border-bottom: 1px solid #3a4150; padding-bottom: .2rem; } "
-    "table { border-collapse: collapse; margin: .5rem 0; font-size: .85rem; } "
-    "th, td { border: 1px solid #3a4150; padding: .15rem .5rem; text-align: left; } "
-    "th { background: #232a36; } "
-    "pre.verbatim { background: #0d1117; border: 1px solid #3a4150; padding: .6rem; "
-    "overflow-x: auto; font-size: .78rem; white-space: pre-wrap; } "
-    "p.verbatim { background: #1d2430; border-left: 3px solid #7a9cc6; padding: .4rem .6rem; } "
-    ".badge { display: inline-block; padding: .1rem .55rem; border-radius: .6rem; "
-    "font-size: .8rem; font-weight: 600; } "
-    ".badge.completed { background: #1d4023; color: #7ce38b; } "
-    ".badge.running { background: #173a52; color: #7cc6ff; } "
-    ".badge.failed { background: #4a1d1d; color: #ff8181; } "
-    ".badge.invalid { background: #4a3d1d; color: #ffd479; } "
-    ".badge.unknown { background: #333a45; color: #ccc; } "
-    ".blockers { background: #4a1d1d; border: 1px solid #ff8181; padding: .5rem .8rem; "
-    "border-radius: .3rem; } "
+    ".p9-report h3 { font-size: .95rem; margin: .8rem 0 .2rem; color: #b9c2d0; } "
+    ".p9-report .table-wrap { overflow-x: auto; max-width: 100%; } "
+    ".p9-report table { border-collapse: collapse; margin: .5rem 0; font-size: .85rem; } "
+    ".p9-report th, .p9-report td { border: 1px solid #3a4150; padding: .15rem .5rem; "
+    "text-align: left; } "
+    ".p9-report th { background: #232a36; } "
+    ".p9-report pre.verbatim { background: #0d1117; border: 1px solid #3a4150; "
+    "border-radius: .3rem; padding: .6rem; overflow-x: auto; font-size: .78rem; "
+    "white-space: pre-wrap; word-break: break-word; "
+    "font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; } "
+    ".p9-report p.verbatim { background: #1d2430; border-left: 3px solid #7a9cc6; "
+    "padding: .4rem .6rem; } "
+    ".p9-report .badge { display: inline-block; padding: .1rem .55rem; "
+    "border-radius: .6rem; font-size: .8rem; font-weight: 600; } "
+    ".p9-report .badge.completed { background: #1d4023; color: #7ce38b; } "
+    ".p9-report .badge.running { background: #173a52; color: #7cc6ff; } "
+    ".p9-report .badge.failed { background: #4a1d1d; color: #ff8181; } "
+    ".p9-report .badge.invalid { background: #4a3d1d; color: #ffd479; } "
+    ".p9-report .badge.unknown { background: #333a45; color: #ccc; } "
+    ".p9-report .blockers { background: #4a1d1d; border: 1px solid #ff8181; "
+    "padding: .5rem .8rem; border-radius: .3rem; } "
+    ".p9-report .muted { color: #8b93a3; font-size: .8rem; }"
+)
+
+# Regras extras APENAS do documento standalone (relatorio.html no zip de
+# download, aberto direto no navegador fora da UI). O fragmento da UI usa
+# o fundo/texto do tema Quasar (dark mode) — não deve redefinir body.
+_STANDALONE_CSS = (
+    "body { background: #14181f; color: #ddd; margin: 1.5rem; "
+    "font-family: system-ui, sans-serif; } "
+    "h1 { font-size: 1.35rem; margin: 0 0 .3rem; } "
     ".muted { color: #8b93a3; font-size: .8rem; }"
 )
 
@@ -127,10 +148,14 @@ def _csv_table(path: Path, source: str) -> str:
         return f"<p class='muted'>{html.escape(source)} vazio.</p>"
     header, body = rows[0], rows[1:]
     shown = body[:_MAX_TABLE_ROWS]
-    parts = ["<table><tr>" + "".join(f"<th>{html.escape(cell)}</th>" for cell in header) + "</tr>"]
+    parts = [
+        '<div class="table-wrap"><table><tr>'
+        + "".join(f"<th>{html.escape(cell)}</th>" for cell in header)
+        + "</tr>"
+    ]
     for row in shown:
         parts.append("<tr>" + "".join(f"<td>{html.escape(cell)}</td>" for cell in row) + "</tr>")
-    parts.append("</table>")
+    parts.append("</table></div>")
     if len(body) > len(shown):
         parts.append(
             f"<p class='muted'>Exibindo {len(shown)} de {len(body)} linhas; "
@@ -187,8 +212,15 @@ def _section_diagnostics(run_dir: Path) -> str:
     return "".join(parts)
 
 
-def render_run_report(run_dir: Path) -> str:
-    """HTML completo do relatório de uma run (uma string; nada é escrito)."""
+def render_run_report_fragment(run_dir: Path) -> str:
+    """Fragmento HTML (sem doctype/html/head/<style>) para a UI embutir.
+
+    O app injeta ``REPORT_CSS`` no <head> da página (ui.add_head_html) e
+    este fragmento via ui.html. A tag <style> NÃO pode vir dentro do
+    fragmento: o sanitizador client-side (DOMPurify) a removeria e a
+    página renderizaria sem nenhuma formatação (bug de 2026-09-14).
+    Conteúdo/caveats continuam verbatim — contrato inalterado.
+    """
     run_dir = Path(run_dir)
     sections = [
         ("Status", _section_status(run_dir)),
@@ -198,11 +230,23 @@ def render_run_report(run_dir: Path) -> str:
         ("Diagnósticos", _section_diagnostics(run_dir)),
     ]
     body = "".join(f"<h2>{title}</h2>{content}" for title, content in sections)
+    return f'<div class="p9-report">{body}</div>'
+
+
+def render_run_report(run_dir: Path) -> str:
+    """Documento HTML COMPLETO e self-contained (zip de download e testes).
+
+    Mesmo conteúdo do fragmento, com o CSS embutido: aberto direto no
+    navegador (ex.: relatorio.html dentro do zip), formatação garantida.
+    """
+    run_dir = Path(run_dir)
+    fragment = render_run_report_fragment(run_dir)
     return (
         "<!doctype html><html><head><meta charset='utf-8'>"
-        f"<title>Run {html.escape(run_dir.name)}</title><style>{_CSS}</style></head><body>"
+        f"<title>Run {html.escape(run_dir.name)}</title>"
+        f"<style>{REPORT_CSS} {_STANDALONE_CSS}</style></head><body>"
         f"<h1>Run: {html.escape(run_dir.name)}</h1>"
         f"<p class='muted'>Relatório gerado pelo dashboard a partir dos artefatos "
         "canônicos; caveats/interpretation e JSONs embutidos verbatim.</p>"
-        f"{body}</body></html>"
+        f"{fragment}</body></html>"
     )
