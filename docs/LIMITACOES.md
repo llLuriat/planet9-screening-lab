@@ -304,6 +304,21 @@ do script: 4e9 (cabe no orçamento de 48h/par). Este JSON substitui o anterior e
 `results/hardware_benchmark.json` (referência antiga do i5-14400 preservada em
 `results/hardware_benchmark_PREVIOUS_i5-14400.json`).
 
+**Atualização 2026-09-15 — re-benchmark no PC LURIAT (mesma máquina,
+Xeon E3-1230 V2, 4 núcleos/8 threads):** re-executado
+`scripts/benchmark_integration_cost.py` → **186.157,3 anos simulados/s**
+(313.584 timesteps/s, single core). Projeções para 4 Gyr: **11,937 h por par
+com/without P9**, **59,687 h para o set de exemplo do script (5 candidatos)**,
+**≈95,5 h para os 8 candidatos do Quadro 2** — em série single-core.
+A medição de 2026-09-13 (145.708,9 anos/s) foi preservada em
+`.dashboard/backups/hardware_benchmark_20260915T010028Z.json` (fora do git).
+A extrapolação de paralelismo medida em 2026-09-14 (w_eff ≈ 4,3–4,6× com 8
+workers, limitada pelos 4 núcleos físicos) segue válida como fator: com ela,
+os 8 candidatos do Quadro 2 caem de ~95,5 h (série) para **≈20,8–22,2 h de
+parede** (conservador: ÷4,0 ≈ 23,9 h). A UI exibe estimativas calculadas a
+partir desta taxa com a data da medição explícita — nunca como número
+universal.
+
 **IMPORTANTE — o número antigo não é universal:** a estimativa de **~6,4 h/par
 e ~25,6 h* citada no plano da Tarefa C é específica do **i5-14400 (16
 threads), 347.886 anos/s** e vale só para aquela máquina. O texto da Tarefa C

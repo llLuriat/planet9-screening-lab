@@ -215,6 +215,12 @@ _BUDGET_HINT_FALLBACK = (
     "quando o YAML e a medição desta máquina permitem calcular."
 )
 
+_MONTECARLO_HINT_FALLBACK = (
+    "Escolha (ou digite o caminho de) um YAML de espaço de parâmetros; a "
+    "estimativa de pior caso aparece aqui quando o YAML e a medição desta "
+    "máquina permitem calcular."
+)
+
 def _pt_num(value: float, ndigits: int = 1) -> str:
     """Número em formato pt-BR (vírgula decimal, ponto de milhar)."""
     return f"{value:,.{ndigits}f}".replace(",", "@").replace(".", ",").replace("@", ".")
@@ -270,6 +276,24 @@ def _measured_years_per_second() -> float | None:
     return None
 
 
+def _benchmark_provenance() -> tuple[float, str] | None:
+    """(taxa anos/s, data da medição) do benchmark REAL desta máquina.
+
+    Fonte obrigatória de todo número de estimativa exibido na UI — o
+    hint deve dizer ONDE/QUANDO foi medido, nunca apresentar como
+    número universal.
+    """
+    data = runstore.read_json(REPO_ROOT / "results" / "hardware_benchmark.json")
+    if not isinstance(data, dict):
+        return None
+    rate = data.get("simulated_years_per_second")
+    measured = data.get("measured_on")
+    if isinstance(rate, (int, float)) and float(rate) > 0.0:
+        date = str(measured)[:10] if measured else "data desconhecida"
+        return float(rate), date
+    return None
+
+
 def _time_hint_text(budget_path: str | None) -> str:
     """Hint do campo ``--budget``: significado prático + tempo estimado medido."""
     if not budget_path:
@@ -290,7 +314,89 @@ def _time_hint_text(budget_path: str | None) -> str:
             "rode scripts/benchmark_integration_cost.py nesta máquina "
             "(results/hardware_benchmark.json ausente ou sem taxa medida)."
         ).strip()
-    return f"{meaning}{_pair_hint_text(years, rate)}".strip()
+    prov = _benchmark_provenance()
+    fonte = (
+        f" Fonte: medição REAL desta máquina em {prov[1]} ({_pt_num(prov[0])} anos/s) "
+        "— não é um número universal."
+        if prov
+        else ""
+    )
+    return f"{meaning}{_pair_hint_text(years, rate)}{fonte}".strip()
+
+
+def _montecarlo_scan_hint_text(config_path: str | None) -> str:
+    """Estimativa do montecarlo-scan: COTAS DE PIOR CASO calculáveis.
+
+    Multiplicadores VÊM DO CÓDIGO (planet9lab/montecarlo.py): stage 2 =
+    UMA branch por amostra (run_branch, L157, sem fator 2 — não é par de
+    controle) no budget de ``stage2_budget``; stage 3 = UMA branch
+    secular (L181) com secular.yaml FIXADO NO CÓDIGO (L297). O total
+    exato não é estimável (depende da fração de sobreviventes por
+    estágio, que o benchmark não mede) — declarado no texto.
+    """
+    if not config_path:
+        return _MONTECARLO_HINT_FALLBACK
+    candidate = Path(str(config_path))
+    if not candidate.is_absolute():
+        candidate = REPO_ROOT / candidate
+    try:
+        data = yaml.safe_load(candidate.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        data = None
+    if not isinstance(data, dict):
+        return (
+            "Estimativa não disponível: não foi possível ler as cotas "
+            f"(max_stage2_samples / max_stage3_samples / stage2_budget) de {config_path}."
+        )
+    max_s2 = data.get("max_stage2_samples")
+    max_s3 = data.get("max_stage3_samples")
+    s2_years = _integration_years_from_budget(
+        str(data.get("stage2_budget", "configs/budgets/montecarlo_stage2.yaml"))
+    )
+    s3_years = _integration_years_from_budget("configs/budgets/secular.yaml")
+    if (
+        not isinstance(max_s2, int)
+        or not isinstance(max_s3, int)
+        or s2_years is None
+        or s3_years is None
+    ):
+        return (
+            "Estimativa não disponível: cotas de amostras ou horizontes "
+            "incompletos no YAML escolhido (o total exato também depende da "
+            "fração de sobreviventes de cada estágio, que o benchmark não mede)."
+        )
+    rate = _measured_years_per_second()
+    if rate is None:
+        return (
+            "Estimativa não disponível: sem taxa medida nesta máquina — rode "
+            "scripts/benchmark_integration_cost.py (results/hardware_benchmark.json)."
+        )
+    s2_hours = max_s2 * s2_years / rate / 3600.0
+    s3_hours = max_s3 * s3_years / rate / 3600.0
+    total = s2_hours + s3_hours
+    prov = _benchmark_provenance()
+    fonte = (
+        f" Fonte: medição REAL desta máquina em {prov[1]} ({_pt_num(prov[0])} anos/s) "
+        "— não é um número universal."
+        if prov
+        else ""
+    )
+    n_points = data.get("n_points")
+    head = (
+        f"Varredura de {_pt_num(float(n_points), 0)} pontos (stage 1 analítico, "
+        "custo desprezível). "
+        if isinstance(n_points, int)
+        else ""
+    )
+    return (
+        f"{head}PIOR CASO (todas as cotas cheias): stage 2 ≤ {max_s2} amostras × "
+        f"1 branch de {_pt_num(s2_years, 0)} anos ≈ {_pt_num(s2_hours * 60.0, 0)} min; "
+        f"stage 3 ≤ {max_s3} amostra(s) × 1 branch de {_pt_num(s3_years, 0)} anos "
+        f"(secular.yaml, fixado no código) ≈ {_pt_num(s3_hours)} h; "
+        f"total ≤ ≈ {_pt_num(total)} h. O total real depende da fração de pontos "
+        "que sobrevive a cada estágio — o benchmark de integração não mede isso, "
+        f"então o valor exato não é estimável.{fonte}"
+    )
 
 
 def _age_text(seconds: float | None) -> str:
@@ -735,9 +841,20 @@ def _launch_form(cmd: dict[str, Any], output: Any, run_options: list[str] | None
                 for arg in args:
                     with ui.column().classes("gap-0 w-full"):
                         fields[arg["flag"]] = _make_field(arg, run_options)
+                        hint_text = None
                         if arg["kind"] == "path" and arg["flag"] == "--budget":
+                            hint_text = _time_hint_text
+                        elif (
+                            arg["kind"] == "path"
+                            and arg["flag"] == "--config"
+                            and name == "montecarlo-scan"
+                        ):
+                            # montecarlo-scan: estimativa de pior caso a partir
+                            # do YAML de espaço de parâmetros escolhido.
+                            hint_text = _montecarlo_scan_hint_text
+                        if hint_text is not None:
                             budget_widget = fields[arg["flag"]]
-                            hint = ui.label(_time_hint_text(budget_widget.value)).classes(
+                            hint = ui.label(hint_text(budget_widget.value)).classes(
                                 "text-caption text-grey-5"
                             )
 
@@ -745,8 +862,9 @@ def _launch_form(cmd: dict[str, Any], output: Any, run_options: list[str] | None
                                 _change: Any,
                                 budget_widget: Any = budget_widget,
                                 hint: Any = hint,
+                                hint_text: Any = hint_text,
                             ) -> None:
-                                hint.set_text(_time_hint_text(budget_widget.value))
+                                hint.set_text(hint_text(budget_widget.value))
 
                             budget_widget.on_value_change(_update_hint)
 

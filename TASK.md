@@ -746,3 +746,15 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
 - **Tarefa C: segue NÃO AUTORIZADA** (correção de interface; nenhum dado/métrica científica alterada).
 - Arquivos: `dashboard/report.py`, `dashboard/app.py`, `tests/test_dashboard_redesign.py` (+3 testes), `TASK.md` (esta entrada).
 - PC: LURIAT
+
+
+## 2026-09-15 (madrugada) — Cline (Executor) — PC LURIAT — Estimativas de tempo com proveniência real para TODO budget + pior caso do montecarlo-scan
+
+- **Re-benchmark adotado:** o Auditor mandou usar "a nova taxa"; a re-medição de 22:00 locais tinha sido descartada pelo meu restore (erro de ordem, reportado) — re-medido de fato nesta máquina (2026-09-15T02:17:43Z): **186.157,3 anos/s** (313.584 steps/s; +27,8% vs 2026-09-13). Novos números: 4 Gyr → 5,969 h/branch, **11,937 h/par**, ~95,5 h (8 do Quadro 2 em série); com w_eff 4,3–4,6× ≈ 20,8–22,2 h de parede. `results/hardware_benchmark.json` commitado; `docs/LIMITACOES.md` ganhou bloco "Atualização 2026-09-15" (medição de 2026-09-13 preservada em `.dashboard/backups/`).
+- **screen/compare:** o hint do `--budget` JÁ recalculava ao trocar o budget (on_value_change); agora todo hint traz a PROVENIÊNCIA obrigatória: "Fonte: medição REAL desta máquina em {data} ({taxa} anos/s) — não é um número universal".
+- **montecarlo-scan:** hint novo no campo `--config` (recalcula ao trocar o YAML). Multiplicadores VÊM DO CÓDIGO (`planet9lab/montecarlo.py`): stage 2 = 1 branch por amostra (L157, sem fator 2) no budget `stage2_budget`; stage 3 = 1 branch secular (L181) com `secular.yaml` FIXADO no código (L297). Com o YAML real (20.000 pontos, caps 200/2): **PIOR CASO ≈ 18 min (stage 2) + 11,9 h (stage 3) ≈ 12,2 h** — e o texto declara que o total exato NÃO é estimável (depende da fração de sobreviventes por estágio, que o benchmark não mede). Sem YAML legível/sem taxa → "Estimativa não disponível" com o motivo (nunca placeholder silencioso).
+- **Testes:** +5 em `tests/test_dashboard_ux.py` (proveniência no hint; hint difere por budget; pior caso do montecarlo com YAML real; honestidade sem taxa; honestidade com YAML inexistente). Validação visual via `nicegui.testing.User`: abrir `/executar/screen` → trocar `--budget` low → secular → hint recalcula na hora (PASSOU; teste temporário, não commitado).
+- Gate: pytest **230 passed** (225 → 230, +5); ruff **All checks passed!**
+- **Tarefa C: segue NÃO AUTORIZADA** (a decisão agora tem custo atualizado: ~20,8–22,2 h de parede nesta máquina com workers).
+- Arquivos: `dashboard/app.py`, `docs/LIMITACOES.md`, `results/hardware_benchmark.json` (re-medição), `tests/test_dashboard_ux.py` (+5), `TASK.md` (esta entrada).
+- PC: LURIAT
