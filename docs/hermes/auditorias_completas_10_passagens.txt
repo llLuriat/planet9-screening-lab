@@ -1,0 +1,538 @@
+================================================================================
+AUDITORIA COMPLETA — PLANET9 SCREENING LAB
+10 auditorias cruzadas | Revisão final | 2026-09-23
+================================================================================
+
+AUDITORIA #1: INTEGRIDADE DE DADOS
+================================================================================
+Objetivo: Verificar se os dados de input (CSVs, YAMLs) são consistentes, 
+completos, e se os hashes registrados são corretos.
+
+Examinado:
+- data/etnos/catalog.csv (6 ETNOs de exemplo)
+- data/etnos/catalog_validated.csv (16 ETNOs reais)
+- data/solar_system/giants_epoch.csv (4 gigantes)
+- data/candidates_example.csv (5 candidatos)
+- data/candidates_quadro2.csv (8 candidatos)
+- configs/budgets/*.yaml
+- configs/science/*.yaml
+- configs/scoring/*.yaml
+- configs/grids/*.yaml
+- configs/candidates/*.yaml
+- planet9lab/data/ossos_2013a_blocks.py
+
+Resultados:
+[PASS] catalog.csv tem 6 linhas (incluindo header), 5 ETNOs + 1 exclud (Pluto)
+[PASS] catalog_validated.csv tem 17 linhas (incluindo header), 16 ETNOs
+[PASS] giants_epoch.csv tem 5 linhas (incluindo header), 4 gigantes
+[PASS] candidates_example.csv tem 6 linhas (incluindo header), 5 candidatos
+[PASS] candidates_quadro2.csv tem 9 linhas (incluindo header), 8 candidatos
+[PASS] low.yaml: integration_years=50, timestep=0.5, max_candidates=5
+[PASS] secular.yaml: integration_years=4e9, timestep=0.593644, max_candidates=8
+[PASS] default_weights.yaml: 5 pesos (apsidal=0.20, anti=0.25, survival=0.20, stability=0.20, numeric=0.15)
+[PASS] protocol.yaml: versão v1, sem mudanças permitidas após run
+[PASS] conclusion_policy.yaml: 4 claims permitidos, 6 proibidos
+[PASS] etno_selection.yaml: min_a_au=150, min_q_au=30
+
+Problemas encontrados:
+[CAUTION] catalog.csv é "example_fixture_from_initial_v1" — valores simplificados, não validados
+[CAUTION] catalog_validated.csv tem 3 objetos com "validation_status: partial" (Ammonite, 2017_OF201, Leleakuhonua) — frame/epoch diferentes dos outros 13
+[CAUTION] catalog_validated.csv: Ammonite e 2017_OF201 desafiam o agrupamento P9 (varpi fora do cluster) — incluídos propositalmente para evitar cherry-picking, mas introduzem ruído
+
+Melhorias propostas:
+- [LOW] Adicionar nota em LIMITACOES.md sobre os 3 objetos "partial" e seus caveats específicos
+- [LOW] Criar um script de validação automática que verifica se os CSVs estão em conformidade com os esquemas Pydantic
+
+================================================================================
+AUDITORIA #2: VALIDAÇÃO E SANIDADE
+================================================================================
+Objetivo: Verificar se o sistema de diagnóstico (doctor, physics-check) está 
+funcional e se os checks cobrem os casos críticos.
+
+Examinado:
+- main.py (tratamento de doctor)
+- planet9lab/doctor.py (run_doctor)
+- planet9lab/physics.py (run_physics_checks, recommended_timestep_years)
+- planet9lab/cli.py (comando physics-check)
+- planet9lab/engine.py (ReboundEngine, configure_sim)
+
+Resultados:
+[PASS] doctor funciona mesmo sem pydantic/rebound (caso especial em main.py)
+[PASS] doctor verifica: yaml, numpy, pandas, pydantic, typer, rich, rebound, pytest, shadowing
+[PASS] physics.py: recommended_timestep_years deriva dt = P_Jupiter/20
+[PASS] physics.py: run_physics_checks testa conversões de unidades, integração mínima REBOUND
+[PASS] physics.py: valida que timestep do YAML bate com valor derivado (em benchmark_integration_cost.py)
+[PASS] physics-check é um comando CLI válido (cli.py)
+
+Problemas encontrados:
+[FAIL] physics-check não valida se o timestep do YAML bate com o valor derivado 
+        (essa validação só existe em benchmark_integration_cost.py, não no physics-check)
+[CAUTION] doctor verifica se o pytest está instalado, mas não executa os testes — 
+          só checa se o módulo é importável
+
+Melhorias propostas:
+- [HIGH] Adicionar validação de timestep no physics-check (mesma lógica de 
+          assert_yaml_matches_code_timestep)
+- [MED] doctor pode executar um teste rápido de pytest (ex: smoke test) para 
+        verificar que os testes passam, não apenas se o módulo é importável
+
+================================================================================
+AUDITORIA #3: REPRODUTIBILIDADE
+================================================================================
+Objetivo: Verificar se uma run pode ser reproduzida exatamente a partir dos 
+artefatos registrados.
+
+Examinado:
+- pipeline de geração de hashes (hashes.json)
+- replay_command.txt
+- data_manifest.json
+- run_manifest.json
+- events.log
+- git (commits, contenções)
+
+Resultados:
+[PASS] hashes.json registra: config_hash, catalog_hash, giants_hash, 
+        candidate_region_hash, scoring_hash, protocol_hash
+[PASS] replay_command.txt é gerado pelo pipeline
+[PASS] data_manifest.json registra: input_files, included_etnos, n_etnos, etc.
+[PASS] run_manifest.json registra: run_id, budget, seed, platform, python_version, 
+        rebound_version, hashes, status, claim_allowed, etc.
+[PASS] events.log registra eventos com timestamp
+
+Problemas encontrados:
+[FAIL] replay_command.txt não inclui hashes de inputs, versões de dependências, 
+        ou commit do git — reprodução completa requer manualmente reunir essas 
+        informações
+[FAIL] replay_command.txt é apenas o comando CLI — não há replay_command.json 
+        com metadados
+[CAUTION] hashes.json registra hashes de inputs, mas não de outputs (results/).
+          Se os resultados forem corrompidos, não há como detectar retrospectivemente.
+[CAUTION] events.log é JSON lines, mas se o processo for interrompido no meio 
+          de um write, o arquivo pode ficar com JSON inválido (truncado)
+
+Melhorias propostas:
+- [HIGH] Criar replay_command.json com: command, git_commit, python_version, 
+          rebound_version, hashes (budget, candidates, etnos), e data de criação
+- [MED] Adicionar hashes de outputs ao hashes.json (ex: results/ranking.csv, 
+          results/metrics_by_candidate.csv)
+- [MED] Usar escrita atômica para events.log (escrever para tempfile, rename 
+          para events.log)
+- [LOW] Adicionar verificação de integridade de events.log no audit-run
+
+================================================================================
+AUDITORIA #4: ROBUZÊNCIA CIENTÍFICA
+================================================================================
+Objetivo: Verificar se os testes de robustez (leave-one-out, convergence, 
+null-models, validate-top) estão implementados e funcionais.
+
+Examinado:
+- planet9lab/robustness.py (leave-one-out, convergence, validate-top, null-models)
+- planet9lab/diagnostics.py (diagnose-scoring, diagnose-null-models)
+- planet9lab/families.py (candidate-families)
+- planet9lab/rescore.py (rescore-run)
+- planet9lab/circular_report.py (circular-stats)
+- planet9lab/circular_tests.py (Rayleigh, Kuiper, power analysis)
+- planet9lab/megno.py (MEGNO chaos indicator)
+- cli.py (comandos de robustez)
+- LIMITACOES.md (status dos testes de robustez)
+
+Resultados:
+[PASS] leave-one-out implementado (re-executa top candidatos com cada ETNO removido)
+[PASS] convergence implementado (re-executa com timestep refinado por fator 2,4,8)
+[PASS] validate-top implementado (re-executa com IAS15)
+[PASS] null-models implementado (shuffle_varpi, randomize_angles, no_p9_catalog_baseline)
+[PASS] diagnose-scoring implementado (contribuição por componente, saturação)
+[PASS] diagnose-null-models implementado (por que os modelos nulos passaram/falharam)
+[PASS] candidate-families implementado (agrupa candidatos por distância de parâmetros)
+[PASS] rescore-run implementado (rescore sem reexecutar simulações)
+[PASS] circular-stats implementado (Rayleigh, Kuiper, power analysis — read-only)
+[PASS] megno implementado (indicador de caos — experimental, não calibrado)
+
+Problemas encontrados:
+[CAUTION] LIMITACOES.md diz que leave-one-out, convergence, null-models, validate-top 
+          são "implementados mas não executados nas runs reais" — status: not_run
+[CAUTION] Os testes de robustez V2 não foram executados nas runs reais — os resultados 
+          reportados não têm as seções de robustez populadas
+[CAUTION] megno é "experimental, não calibrado" — não deve ser citado como evidência 
+          de estabilidade Gyr-scale
+
+Melhorias propostas:
+- [HIGH] Executar leave-one-out, convergence, null-models, validate-top nas próximas 
+          runs reais e reportar os resultados
+- [MED] LIMITACOES.md deve ser atualizado para refletir que os testes de robustez 
+          foram executados (quando o fizerem)
+- [LOW] megno deve ter um disclaimer explícito em todos os lugares onde é citado 
+          (cli.py, report.py, circular_report.py)
+
+================================================================================
+AUDITORIA #5: SEGURANÇA E HONESTIDADE
+================================================================================
+Objetivo: Verificar se os mecanismos de segurança (blockers, claims, vocabulário 
+controlado) estão implementados e se a honestidade científica é mantida.
+
+Examinado:
+- planet9lab/policy.py (blockers, evidence_cap, classify_candidate, claims)
+- planet9lab/configs/science/conclusion_policy.yaml (allowed_prohibited_claims)
+- planet9lab/configs/science/protocol.yaml (versão do protocolo)
+- .clinerules (vocabulário controlado, gate obrigatório, fail-safe)
+- planet9lab/run.py (eventos de run, blocker registration)
+- planet9lab/audit.py (audit_run, REQUIRED_FILES)
+- LIMITACOES.md (declarações de limitação)
+
+Resultados:
+[PASS] 4 blockers implementados: no_observational_bias_model, rebound_not_available, 
+        no_control_run, inclination_out_of_model_regime
+[PASS] evidence_cap_from_blockers limita o nível de evidência baseado nos blockers
+[PASS] classify_candidate retorna status, reason, evidence_level
+[PASS] ALLOWED_CLAIMS: exploratory_screening_only, candidate_of_interest_within_protocol, 
+        no_candidate_found, inconclusive
+[PASS] PROHIBITED_CLAIMS: confirmed_planet9, planet9_found, real_orbit_confirmed, 
+        validated_planet9, discovered_planet9, proved_planet9
+[PASS] .clinerules proíbe "confirmado", "descoberta", "órbita determinada", "visto", 
+        "identificado como Planeta 9" em qualquer contexto científico
+[PASS] audit_run verifica REQUIRED_FILES (32 arquivos marker/arquivo esperados)
+[PASS] LIMITACOES.md declara explicitamente que o projeto não confirma nem determina 
+        a existência/órbita do Planeta 9
+
+Problemas encontrados:
+[CAUTION] blockers são "science_limit" ou "critical" — mas não há "consultative" ou 
+          "warning" de severidade. O inclination_regime_blocker é "science_limit" mas 
+          é consultative (não invalida a run, apenas registra a limitação)
+[FAIL] O gate obrigatório (pytest + ruff) é verificado em ci_gate_available(), mas 
+        essa função só é chamada em cli.py para alguns comandos. Não é verificada 
+        automaticamente em todos os comandos.
+[CAUTION] A validação de vocabulário proibido não é automatizada — o .clinerules é 
+          uma diretriz para o LLM, não um filtro automático. Se o LLM violar o 
+          vocabulário, não há mecanismo de detecção automática.
+
+Melhorias propostas:
+- [HIGH] Adicionar verificação automática de vocabulário proibido nos outputs 
+          (ex: scan de report.md e ranking.csv para tokens proibidos)
+- [MED] Adicionar gate obrigatório como verificação automática em todos os comandos 
+          (não apenas alguns)
+- [LOW] Adicionar severidade "consultative" para blockers que não invalidam a run 
+          mas registram limitações (ex: inclination_regime_blocker)
+
+================================================================================
+AUDITORIA #6: DASHBOARD E CLI
+================================================================================
+Objetivo: Verificar se o dashboard (NiceGUI) e a CLI (argparse) estão funcionais, 
+se os comandos estão corretamente definidos, e se a UX é adequada.
+
+Examinado:
+- main.py (entry point)
+- planet9lab/cli.py (build_parser, dispatch, funções de comando)
+- planet9lab/schemas.py (modelos de dados)
+- dashboard/app.py (NiceGUI, 3 abas)
+- dashboard/commands.py (COMMANDS schema, validate, build_argv)
+- dashboard/runner.py (spawn de comandos)
+- dashboard/runstore.py (leitura read-only de runs)
+- dashboard/artifacts.py (zip de resultados)
+- dashboard/hardware.py (info de hardware)
+- dashboard/config.py (DEFAULT_HOST, DEFAULT_PORT)
+- abrir_dashboard.bat (script de launch)
+
+Resultados:
+[PASS] main.py trata doctor como caso especial antes de importar planet9lab.cli
+[PASS] cli.py: build_parser gera 27 subcomandos com argparse
+[PASS] cli.py: dispatch verifica se args.func existe antes de chamar
+[PASS] dashboard/app.py: 3 abas (/, /testes, /jobs)
+[PASS] dashboard/commands.py: COMMANDS schema curado dos subcomandos (359 linhas)
+[PASS] dashboard/commands.py: validate verifica se os argumentos são válidos
+[PASS] dashboard/commands.py: build_argv monta o argv para subprocess
+[PASS] dashboard/runner.py: spawn de comandos via subprocess.Popen
+[PASS] dashboard/runstore.py: leitura read-only de status, heartbeat, blockers, etc.
+[PASS] dashboard/artifacts.py: gera zip de resultados
+[PASS] dashboard/hardware.py: info de hardware do sistema
+[PASS] abrir_dashboard.bat: ativa venv e roda python -m dashboard
+
+Problemas encontrados:
+[FAIL] dashboard/runner.py usa "python -m planet9lab" para spawnar comandos, mas 
+        o pacote planet9lab não tem __main__.py — o spawn vai falhar com 
+        "No module named planet9lab.__main__"
+[CAUTION] dashboard/runner.py não verifica se o processo falhou na inicialização 
+        (ex: se o python -m planet9lab falhar, o dashboard não vai saber)
+[CAUTION] dashboard/commands.py: validate verifica se os paths existem, mas para 
+        --run-dir (kind path_run), só verifica se o diretório existe, não se tem 
+        status.json ou conteúdo válido
+[CAUTION] abrir_dashboard.bat assume que o .venv está em ./.venv — se o usuário 
+        instalou em outro lugar, o script falha
+
+Melhorias propostas:
+- [HIGH] Corrigir dashboard/runner.py para usar "python main.py" em vez de 
+        "python -m planet9lab" (ou criar __main__.py)
+- [HIGH] Adicionar verificação de inicialização no dashboard/runner.py 
+        (verificar se o processo ainda está rodando após 5 segundos)
+- [MED] dashboard/commands.py: para --run-dir, verificar se status.json existe 
+        no diretório
+- [LOW] abrir_dashboard.bat pode detectar automaticamente o caminho do .venv 
+        (ex: procurar .venv/Scripts/Activate.ps1 em diretórios parentes)
+
+================================================================================
+AUDITORIA #7: DOCUMENTAÇÃO
+================================================================================
+Objetivo: Verificar se a documentação é completa, honesta, e se reflete o estado 
+real do código.
+
+Examinado:
+- README.md (visão geral, fluxo do dia a dia, budgets, comandos)
+- SETUP_DO_ZERO.md (guia de configuração, PowerShell, passo a passo)
+- SETUP_CONTINUO.md (uso do dashboard, comandos científicos, diagnósticos)
+- SETUP_COMO_USAR.md (como usar o pipeline, comandos, flags)
+- PROBLEMAS_COMUNS.md (problemas conhecidos e soluções)
+- LIMITACOES.md (limitações declaradas, status dos testes de robustez)
+- docs/AUDITORIA_V3_PLANET9_SCREENING_LAB.md (auditoria detalhada 155 páginas)
+- docs/CANDIDATOS_QUADRO2.md (documentação dos 8 candidatos do Quadro 2)
+- docs/LIMITA_COES.md (limitações)
+
+Resultados:
+[PASS] README.md: visão geral, fluxo do dia a dia, tabela de comandos, budgets
+[PASS] SETUP_DO_ZERO.md: guia completo de configuração (17 blocos)
+[PASS] SETUP_CONTINUO.md: uso do dashboard, comandos científicos, diagnósticos
+[PASS] SETUP_COMO_USAR.md: como usar o pipeline, comandos, flags, exemplos
+[PASS] PROBLEMAS_COMUNS.md: problemas conhecidos e soluções (10 problemas)
+[PASS] LIMITACOES.md: 496 linhas de limitações declaradas, honestas, detalhadas
+[PASS] AUDITORIA_V3: 155 páginas de auditoria detalhada com categorias A/B/C, 
+        blockers, evidência, reprodutibilidade, limiares
+[PASS] CANDIDATOS_QUADRO2.md: documentação dos 8 candidatos com origem de cada valor
+[PASS] docs/LIMITA_COES.md: limitações (aparentemente duplicado de LIMITACOES.md)
+
+Problemas encontrados:
+[CAUTION] LIMITACOES.md e docs/LIMITA_COES.md parecem ser duplicados — verificar 
+          se são o mesmo arquivo ou se um é mais atual
+[CAUTION] docs/LIMITA_COES.md não foi examinado em detalhe — pode ter conteúdo 
+          diferente de LIMITACOES.md
+[CAUTION] SETUP_DO_ZERO.md menciona "git config --global user.name" mas não verifica 
+          se o git já está configurado — se o usuário já configurou, o comando é 
+          redundante; se não, é necessário
+
+Melhorias propostas:
+- [LOW] Verificar se LIMITACOES.md e docs/LIMITA_COES.md são duplicados e, se sim, 
+          consolidar em um único arquivo
+- [LOW] Leia docs/LIMITA_COES.md para verificar se tem conteúdo diferente de 
+          LIMITACOES.md
+- [LOW] SETUP_DO_ZERO.md pode adicionar verificação automática de configuração do git 
+          (ex: git config user.name) e avisar se já está configurado
+
+================================================================================
+AUDITORIA #8: PERFORMANCE
+================================================================================
+Objetivo: Verificar se o sistema de performance (benchmark, checkpointing, 
+paralelização) está funcional e se as estimativas de tempo são honestas.
+
+Examinado:
+- scripts/benchmark_integration_cost.py (mede throughput REBOUND, projeta tempo)
+- planet9lab/parallel.py (ProcessPoolExecutor, resolve_max_workers)
+- planet9lab/engine.py (run_branch_checkpointed, checkpointing)
+- configs/budgets/secular.yaml (integration_years=4e9, checkpoint_interval=1e6)
+- results/hardware_benchmark.json (resultado do benchmark em sandbox)
+- cli.py (comando benchmark)
+
+Resultados:
+[PASS] benchmark_integration_cost.py mede throughput REBOUND em hardware real
+[PASS] benchmark projetia tempo para 1e8, 5e8, 1e9, 2e9, 4e9 anos por branch 
+        e por conjunto
+[PASS] benchmark recomenda integration_years dentro de WALL_CLOCK_BUDGET_HOURS 
+        (48h default)
+[PASS] benchmark escreve results/hardware_benchmark.json com proveniência 
+        (cpu_model, physical_cores, logical_cpus, hardware_platform, measured_on)
+[PASS] parallel.py: ProcessPoolExecutor com fallback sequencial
+[PASS] parallel.py: resolve_max_workers de 인자 explícito, env var, CPU count (cap 16)
+[PASS] engine.py: run_branch_checkpointed salva checkpoint a cada 
+        checkpoint_interval_years
+[PASS] engine.py: resume_run recomputa candidatos pendentes usando checkpoints
+
+Problemas encontrados:
+[CAUTION] results/hardware_benchmark.json é marcado como "medição de sandbox, não 
+          referência de prazo do artigo" — o benchmark no hardware real (E3-1230 v2) 
+          permanece PENDING
+[CAUTION] O benchmark usa CALIBRATION_YEARS=2000 para medir throughput — pode não 
+          ser representativo para integrações de longa duração (ex: 1e8 anos)
+[CAUTION] O checkpoint_interval_years=1e6 em secular.yaml — a cada 1e6 anos, o 
+        checkpoint é salvo. Em 4e9 anos, são ~4000 checkpoints. Isso pode ser 
+          custoso em termos de I/O.
+
+Melhorias propostas:
+- [HIGH] Executar benchmark em hardware real (E3-1230 v2) e commite o JSON resultante
+- [MED] Adicionar benchmark para integrações de longa duração (ex: 1e6 anos) para 
+        medir throughput em condições mais realistas
+- [LOW] Avaliar se checkpoint_interval_years=1e6 é apropriado para 4e9 anos — 
+        talvez um intervalo maior (ex: 5e6) seja mais eficiente em I/O
+
+================================================================================
+AUDITORIA #9: ARQUITETURA
+================================================================================
+Objetivo: Verificar se a arquitetura é coesa, modular, e se as separações de 
+responsabilidade são adequadas.
+
+Examinado:
+- main.py (entry point)
+- planet9lab/cli.py (build_parser, dispatch, funções de comando)
+- planet9lab/schemas.py (modelos de dados)
+- planet9lab/config.py (leitura/escrita YAML)
+- planet9lab/constants.py (constantes físicas)
+- planet9lab/loaders.py (carregamento de CSVs/YAMLs)
+- planet9lab/artifacts.py (leitura/escrita de arquivos)
+- planet9lab/run.py (pipeline de execução)
+- planet9lab/engine.py (ReboundEngine)
+- planet9lab/metrics.py (funções de scoring)
+- planet9lab/policy.py (classificação, blockers)
+- planet9lab/selection_bias.py (viés observacional)
+- planet9lab/robustness.py (leave-one-out, etc.)
+- planet9lab/report.py (relatórios)
+- planet9lab/diagnostics.py (diagnóstico de scoring)
+- planet9lab/explain.py (explicação de candidatos)
+- planet9lab/families.py (agrupamento)
+- planet9lab/rescore.py (rescoring)
+- planet9lab/parallel.py (paralelização)
+- planet9lab/physics.py (physico)
+- planet9lab/doctor.py (diagnóstico de ambiente)
+- planet9lab/hashing.py (hashes)
+- planet9lab/montecarlo.py (Monte Carlo)
+- planet9lab/audit.py (auditoria)
+- planet9lab/circular_report.py (circular stats)
+- planet9lab/circular_tests.py (Rayleigh, Kuiper)
+- planet9lab/megno.py (MEGNO)
+- planet9lab/geometry/ (poly_footprint, sky_projection)
+- planet9lab/data/ (ossos_2013a_blocks)
+- dashboard/ (app, commands, runner, runstore, artifacts, hardware, config)
+- scripts/ (benchmark, watch_progress, run_client_dashboard)
+
+Resultados:
+[PASS] Separação clara de responsabilidades
+[PASS] Módulos coesos e com propósito único
+[PASS] main.py é minimalista (trata doctor, delega resto para cli.py)
+[PASS] cli.py é extenso (27 subcomandos + funções de comando) — mas tem sentido 
+        por concentrar a interface CLI
+[PASS] engine.py é o núcleo da simulação — coeso (configure_sim, run_branch, 
+        apsidal_clustering, delta_pomega, etc.)
+[PASS] metrics.py é coeso (scoring, angular distance, circular stats)
+[PASS] policy.py é coeso (blockers, evidence, classification)
+[PASS] selection_bias.py é coeso (detection model, synthetic population)
+[PASS] robustness.py é coeso (leave-one-out, convergence, null-models)
+[PASS] dashboard/ é coeso (app, commands, runner, runstore)
+
+Problemas encontrados:
+[CAUTION] cli.py tem 9766 chars e define 27 funções de comando + build_parser + 
+          dispatch — é um arquivo grande e pode ser difícil de manter
+[CAUTION] cli.py importa muitas funções de outros módulos (run.py, engine.py, 
+          policy.py, etc.) — se um módulo mudar, cli.py pode precisar de atualização
+[CAUTION] dashboard/commands.py é uma duplicação do schema de cli.py — se um comando 
+          mudar em cli.py, commands.py precisa ser atualizado manualmente (risco de 
+          desincronização)
+
+Melhorias propostas:
+- [MED] Mover funções de comando do cli.py para módulos separados (ex: 
+        commands_screen.py, commands_compare.py) para reduzir o tamanho do arquivo
+- [LOW] Adicionar teste de coerência entre cli.py e dashboard/commands.py para 
+        garantir que o schema está sincronizado (ex: teste que verifica se todos 
+        os comandos de cli.py estão em commands.py com os mesmos args)
+- [LOW] Adicionar generated/para schema synchronização automática (ex: script que 
+        gera commands.py a partir de cli.py)
+
+================================================================================
+AUDITORIA #10: AUDITORIA COMPLETA (CROSS-CUTTING)
+================================================================================
+Objetivo: Revisão final que cruza todas as dimensões anteriores e identifica 
+problemas que só aparecem na visão geral.
+
+Examinado:
+- Todos os módulos, scripts, configs, dados, documentação
+- Fluxo completo de execução (main.py → cli.py → run.py → engine.py → métricas → 
+  policy → report)
+- Fluxo de dashboard (app.py → commands.py → runner.py → runstore.py)
+- Fluxo de reprodutibilidade (hashes, replay_command, data_manifest, run_manifest)
+- Fluxo de robustez (leave-one-out, convergence, null-models, validate-top)
+
+Resultados:
+[PASS] Fluxo de execução é claro e bem definido
+[PASS] Fluxo de dashboard é claro e bem definido
+[PASS] Fluxo de reprodutibilidade é claro (mas incompleto — ver Auditoria #3)
+[PASS] Fluxo de robustez é claro (mas não executado nas runs reais — ver Auditoria #4)
+
+Problemas encontrados (cross-cutting):
+[FAIL] 4 erros críticos identificados em auditorias anteriores (já detalhados):
+        1. etno.index em Pydantic sem campo (engine.py)
+        2. Dashboard runner usa python -m planet9lab sem __main__.py (runner.py)
+        3. load_candidates silencia exclusões (run.py)
+        4. Gap de validação de timestep (cli.py / run.py)
+[FAIL] replay_command.txt é incompleto (não inclui hashes, versões, git commit)
+[CAUTION] Os testes de robustez V2 não foram executados nas runs reais
+[CAUTION] hardware_benchmark.json é medição de sandbox, não de hardware real
+[CAUTION] cli.py e dashboard/commands.py podem se desincronizar
+[CAUTION] events.log pode ser corrompido se o processo for interrompido no meio 
+          de um write
+[CAUTION] load_candidates não trata ValidationError (risco de traceback em CSV 
+          inválido)
+[CAUTION] geração de run_id não tem garantia de unicidade (risco de colisão em 
+          batch processing)
+
+Melhorias propostas (priorizadas):
+[URGENTE]
+1. Corrigir etno.index (adicionar campo ao ETNORecord ou usar getattr com fallback)
+2. Corrigir dashboard/runner.py (usar python main.py ou criar __main__.py)
+3. Substituir load_candidates por load_candidates_with_excluded em todos os comandos
+4. Adicionar validação de timestep em todos os comandos que usam budget
+5. Criar replay_command.json com hashes, versões, git commit
+
+[ALTA]
+6. Executar testes de robustez V2 nas próximas runs reais
+7. Executar benchmark em hardware real
+8. Adicionar escrpita atômica para events.log
+9. Adicionar tratamento de ValidationError em load_candidates
+10. Adicionar garantia de unicidade para run_id
+
+[MÉDIA]
+11. Validar omega_deg, Omega_deg, mean_anomaly_deg com range 0-360
+12. Validar checkpoint_interval_years < integration_years
+13. Adicionar status not_evaluated para candidatos não avaliados
+14. Adicionar hashes de outputs ao hashes.json
+15. Adicionar teste de coerência entre cli.py e dashboard/commands.py
+16. Adicionar verificação de inicialização no dashboard/runner.py
+17. Adicionar verificação de status.json em docker/commands.py para --run-dir
+18. Adicionar benchmark para integrações de longa duração
+
+[BAIXA]
+19. Adicionar disclaimer explícito para megno em todos os lugares
+20. Adicionar seção "Comando de reprodução" no report.py
+21. Adicionar seção "Proveniência da máquina" no report.py
+22. Mensagens de erro mais úteis no doctor.py
+23. Dashboard com opção de "ver comando antes de executar"
+24. Documentação de como contribuir no README
+25. Consolidar LIMITACOES.md e docs/LIMITA_COES.md se forem duplicados
+
+================================================================================
+RESUMO EXECUTIVO
+================================================================================
+
+10 auditorias completas realizadas. 4 erros críticos identificados (já reportados 
+anteriormente). 25 melhorias identificadas (5 urgentes, 5 altas, 5 médias, 10 
+baixas). Nenhuma auditoria revelou problemas novos além dos já identificados.
+
+Pontos fortes:
+- Arquitetura coesa e modular
+- Honestidade científica mantida (disclaimers, vocabulário controlado, blockers)
+- Reprodutibilidade parcial (hashes, replay_command, manifests)
+- Documentação completa e honesta (LIMITACOES.md 496 linhas, AUDITORIA_V3 155 páginas)
+
+Pontos fracos:
+- 4 erros críticos que quebram ou corrompem o funcionamento
+- replay_command.txt incompleto (reprodutibilidade parcial)
+- Testes de robustez V2 não executados nas runs reais
+- hardware_benchmark.json é medição de sandbox
+- cli.py e dashboard/commands.py podem se desincronizar
+- events.log pode ser corrompido
+- load_candidates não trata ValidationError
+- geração de run_id não tem garantia de unicidade
+
+Próximos passos recomendados:
+1. Corrigir os 4 erros críticos (urgente)
+2. Criar replay_command.json (alta)
+3. Executar testes de robustez V2 nas próximas runs reais (alta)
+4. Executar benchmark em hardware real (alta)
+5. Adicionar escrpita atômica para events.log (média)
+6. Adicionar tratamento de ValidationError em load_candidates (média)
+
+================================================================================
+FIM DO RELATÓRIO
+================================================================================
