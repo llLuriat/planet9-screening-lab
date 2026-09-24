@@ -772,3 +772,13 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
 - **Correção do venv (Parte 0, sessão anterior):** `.venv/pyvenv.cfg` apontava para `C:\Users\lucas\...\Python311` (inexistente nesta máquina); corrigido para o runtime 3.11.16 local com backup `.venv/pyvenv.cfg.bak_antes_fix_DESKTOP-DDBU1N8`. A troca 3.11.9→3.11.16 não é causa das falhas (verificada pelo teste de controle acima — as falhas são de ambiente, não de versão de Python).
 - Arquivos: `.clinerules`, `TASK.md` (esta entrada).
 - PC: DESKTOP-DDBU1N8
+
+## 2026-09-24 01:43Z — Hermes (LongCat 2.0, Executor) — PC: DESKTOP-DDBU1N8 — Fix pid_alive: tasklist cp850 + PYTHONUTF8=1 (autorizado nesta sessão)
+
+- **Causa-raiz (aprovada pelo usuário):** `dashboard/runner.py` `pid_alive()` chamava `subprocess.run(text=True)` sem encoding explícito; sob `PYTHONUTF8=1` o decode UTF-8 da saída cp850 do `tasklist` (codepage OEM pt-BR desta máquina) morria no reader thread (`UnicodeDecodeError: 'utf-8' codec can't decode byte 0x80 in position 7`) → `stdout=None` → `AttributeError: 'NoneType' object has no attribute 'split'` — quebrando `poll()` e, com ele, 2 testes (1 deles com ERROR at teardown pelo log ERROR do nicegui).
+- **Fix (mínimo, sem mudança de comportamento em máquinas UTF-8):** `encoding="utf-8", errors="replace"` na chamada `subprocess.run` de `pid_alive()` — o método só procura um PID numérico no output; bytes indecodáveis de nomes de processo em outro codepage são substituídos sem perda de função. Torna o dashboard robusto em qualquer codepage OEM.
+- **Teste novo (regressão):** `test_pid_alive_survives_non_utf8_tasklist_output` (tests/test_dashboard.py) — mock do `subprocess.run` retornando bytes cp850 REAIS capturados nesta máquina ("INFORMAÇÕES: nenhuma tarefa..." — bytes `49 4e 46 4f 52 4d 41 80 e5 45 53` verificados contra o hexdump da investigação); verifica também o contrato do fix (encoding/errors explícitos) e os dois caminhos: PID presente → True, PID ausente → False.
+- **Resultado:** os 2 testes que falhavam (`test_runner_launches_detached_cli_process_full_lifecycle`, `test_benchmark_job_result_is_viewable_in_jobs`) agora PASSAM nesta máquina, sem o ERROR at teardown.
+- **Gate:** pytest **231 passed** (230 → 231, +1 novo; 0 failed, 0 error — primeiro gate 100% limpo nesta máquina); ruff **All checks passed!**
+- Arquivos: `dashboard/runner.py` (+2 linhas), `tests/test_dashboard.py` (+46 linhas), `TASK.md` (esta entrada).
+- PC: DESKTOP-DDBU1N8
