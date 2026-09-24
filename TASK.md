@@ -879,3 +879,31 @@ Auditor/usuário (ex.: `git add` do move + reverter o espaço do `.gitignore`).
   (run vigente), `runs\screen_20260924T173651761759Z\` (órfã, preservada).
 - PC: C206-EDUC-333
 
+
+### 2026-09-24 (fechamento da sessão) — Cline (Executor) — PC C206-EDUC-333 — Gate de FIM DE TAREFA + taxa da run reconciliada
+
+- **Gate de fim de tarefa (`.clinerules`):** `python -m ruff check .` → **All checks passed!**;
+  `python -m pytest -q` → **230 passed in 278,26 s (4m38s)**. Rodado **com a run secular em
+  curso**, com o processo do pytest em prioridade `BelowNormal` para não competir com os
+  5 workers (a run perdeu ~1 min de ritmo nesse intervalo — custo real, registrado aqui).
+  O código é **byte-idêntico** ao do gate anterior: `git diff --stat 8f74010..HEAD` mostra
+  apenas `TASK.md` e `results/hardware_benchmark_C206-EDUC-333.json` (nenhum `.py`/teste).
+- **Taxa reconciliada (medição em janela controlada de 61 s, 14:48:07→14:49:08):**
+  t passou de 0,064 → 0,076 Gyr por branch ⇒ **196.700 anos/s por candidato**; média desde
+  o início (14:42:19 → 14:53:23, t=0,126 Gyr) ≈ **186.000 anos/s**. Confere com o benchmark
+  single-core (205.180) e com a janela de 120 s anterior (199.944). Logo: **5,85 h por
+  branch** ⇒ **run inteira ≈ 11,7 h** ⇒ término previsto em **2026-09-25 ~02:25 locais**.
+- **Correção de rumo honesta:** uma primeira leitura grosseira (t=0,062 Gyr lido contra um
+  tempo decorrido que eu estimei errado) sugeriu ~88.000 anos/s; era **erro aritmético meu**,
+  não estagnação da run. Re-medido com janela controlada antes de publicar qualquer ETA.
+- **Estado no fechamento:** `runs\screen_20260924T174217246692Z` — `status: running`,
+  5 workers vivos, t=0,126 Gyr dos 4,000 Gyr por branch (3,1%), `checkpoints\` com 127
+  intervalos de 1e6 yr por branch. Nenhum artefato científico final existe ainda
+  (`results\ranking.csv` só aparece na finalização) — **nada a revisar/atualizar no artigo
+  até a run terminar**.
+- **Recomendação operacional (crítica, ver B3):** manter a máquina **ligada e na tomada**
+  (AC já está com "suspender = nunca") até ~02:30 de 25/09; se desligar, a run precisa ser
+  reiniciada do zero.
+- Commit: pendente nesta entrada.
+- PC: C206-EDUC-333
+
