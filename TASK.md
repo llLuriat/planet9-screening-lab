@@ -309,6 +309,45 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
 **Pendência B2 fechada — nada a fazer nesta seção.**
 
 
+### B3 — `resume` NÃO retoma uma run `screen` INTERROMPIDA (descoberto ao vivo; precisa de decisão do Auditor)
+
+Verificado empiricamente em 2026-09-24 nesta máquina. O portão de
+`planet9lab/run.py` (`resume_run`, L1190-1198) exige `audit/run_manifest.json`,
+mas esse arquivo só é gravado na **FINALIZAÇÃO** da run (`run.py` L991, junto com
+`results/ranking.csv`, `audit/blockers.json` e `reports/report.md`). Portanto:
+
+- `planet9lab/engine.py` L312-315 afirma que os checkpoints tornam a integração
+  "survivable across interruptions (crash, reboot, time limit)"; a promessa
+  **não se sustenta hoje**: os snapshots REBOUND (`.bin`) e as séries CSV **são**
+  gravados (medido: 37 checkpoints em ~3,5 min) e `run_branch_checkpointed` sabe
+  retomar de um snapshot, mas o portão do `resume` aborta antes de chegar lá.
+- **Consequência prática para a Tarefa C:** a run de 4 Gyr precisa terminar numa
+  **única janela contínua** (~11-13 h de parede nesta máquina). Queda de energia,
+  desligamento ou travamento obriga a **começar de zero** — os checkpoints ficam
+  no disco, mas não são retomáveis.
+- **Evidência:** `python main.py resume runs\screen_20260924T173651761759Z --max-workers 5`
+  → `FileNotFoundError: Cannot resume ...: missing one of audit/run_manifest.json,
+  config.resolved.yaml, candidates_input.csv` (só o manifesto faltava; os outros
+  dois estavam presentes).
+- **Não corrigido** (é mudança de pipeline; exige autorização): opções =
+  (a) gravar `run_manifest.json` no **início** da run e reescrever no fim; ou
+  (b) relaxar `resume_run` para reconstruí-lo a partir de `config.resolved.yaml`
+  + `candidates_input.csv` + `environment.json` quando faltar.
+- **Pasta órfã** da tentativa interrompida: `runs\screen_20260924T173651761759Z`
+  (mantida intacta, **não apagada** por mim: 4 `.bin` + séries até t≈3,7e7 yr e
+  `RUNNING.lock`). Precisa de decisão: apagar, marcar como abandonada, ou usar
+  como base se o B3 for corrigido.
+
+### B4 — Alterações NÃO commitadas que já existiam antes desta sessão (não são minhas)
+
+Já no estado inicial (primeiro `git status` desta máquina, após religar o Git):
+` M .gitignore` (um espaço extra antes do comentário da 1ª linha — edição
+acidental) e ` D docs/PLANET9_ARTIGO_v2_ABNT.docx` + `?? docs/archive/PLANET9_ARTIGO_v2_ABNT.docx`
+(documento movido para `docs/archive/` em 2026-09-13 sem `git add`/`git mv`).
+**Nada disso foi commitado, revertido ou movido por mim.** Aguardando decisão do
+Auditor/usuário (ex.: `git add` do move + reverter o espaço do `.gitignore`).
+
+
 ---
 
 ## Log de execução (só o Executor edita esta seção — sempre APPEND, nunca reescrever entradas antigas)
@@ -791,5 +830,52 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
 - **Passo 4/5 (custo e monitoramento):** custo esperado ≈54,2 h de CPU (10 integrações × 5,42 h/branch) ⇒ **~13–14 h de parede** com 4 workers. Checkpoint a cada 1e6 anos ≈ 126 s de integração, então uma queda custa no máximo ~2 min de trabalho; se a máquina for desligada, retomar com `python main.py resume runs\screen_20260924T173651761759Z --max-workers 4` (comando `resume` confirmado no `cli.py`; só candidatos pendentes são refeitos).
 - **Passo 6 (ao terminar):** registrar `SUCCESS.marker`/`status.json`/`results\ranking.csv` aqui e sinalizar em "Bloqueios" que a atualização do artigo está pronta para revisão — **sem** atualizar o artigo sozinho.
 - Arquivos: `TASK.md` (esta entrada), `results/hardware_benchmark_C206-EDUC-333.json`, `runs\screen_20260924T173651761759Z\` (artefatos da run).
+- PC: C206-EDUC-333
+
+
+### 2026-09-24 (continuação) — Cline (Executor) — PC C206-EDUC-333 — Tarefa C: run reiniciada com 5 workers + correção de uma afirmação minha sobre `resume`
+
+- **Correção honesta do que eu mesmo escrevi minutos antes nesta seção:** ao tentar
+  retomar após interromper, descobri que **`resume` NÃO funciona para run `screen`
+  interrompida** (o portão exige `audit/run_manifest.json`, gravado só na
+  finalização — `run.py` L991 vs L1190-1198). A frase "se a máquina for desligada,
+  retomar com `python main.py resume ...`" que escrevi na entrada anterior está
+  **ERRADA** e fica corrigida aqui. Detalhe completo em **Bloqueios B3**.
+- **Ajuste de paralelismo 4 → 5 workers, com medição:** a 1ª tentativa usava 4
+  workers para 5 candidatos ⇒ 2 ondas (~11 h + ~11 h ≈ 22 h de parede). Medido no
+  processo real: cada worker consome só **5-8 MB de RAM** (não os ~100 MB que eu
+  supus) e a máquina mantinha 0,5 GB livres ⇒ a concorrência por RAM **não era**
+  problema. Com 5 workers (= 5 candidatos) tudo roda numa única onda: ~10,8 h de
+  CPU por candidato a ~0,8 core efetivo ⇒ **~11-13 h de parede**.
+- **Interrupção da 1ª tentativa:** custou ~3,7e7 yr por branch (0,9% de 4 Gyr),
+  preservado em `runs\screen_20260924T173651761759Z\checkpoints\` (pasta órfã — B3).
+- **Run vigente: `runs\screen_20260924T174217246692Z`** — PID 9612, 5 workers
+  (PIDs 532/3760/8024/9868/10904), `integration_years: 4e9`,
+  `timestep_years: 0.593644`, `checkpoint_interval_years: 1e6`, `status: running`,
+  `candidates_total: 5`, iniciada em `2026-09-24T17:42:18.61Z`.
+- **Progresso verificado por artefato (não por achismo):** 20 checkpoints em ~90 s
+  e, depois, medição em janela de **120 s** com os 5 workers em regime:
+  **199.944 anos/s por candidato (branch)** — praticamente igual ao benchmark
+  single-core (205.180 anos/s) ⇒ **~1.000.000 anos/s agregado**, com cada worker
+  consumindo **~97% de um core** (117 s de CPU em 120 s). Ou seja: as 5 threads
+  paralelas quase não se penalizam nesta máquina (o ganho do paralelismo é ~5×,
+  não os ~4,3× do LURIAT). ETA: 5,56 h por branch ⇒ **~11,1 h de parede** para a
+  run inteira ⇒ término esperado em **2026-09-25 ~02:00–04:00 locais**.
+  Obs. honesta: nos ~3,5 min iniciais da 1ª tentativa (4 workers) os checkpoints
+  avançaram a só ~169.000 anos/s **agregados** (≈4× menos por worker); a causa não
+  foi determinada (atividade concorrente da minha própria configuração/medições
+  naqueles minutos — 3 benchmarks + pytest + Defender), e é justamente por isso que
+  taxa foi re-medida em regime antes de fixar o ETA.
+- **Energia (requisito para a run sobreviver à noite, já que ela NÃO é retomável —
+  B3):** `powercfg` → AC "Suspender depois de" = **0 (nunca)**; DC = 15 min.
+  Portanto, **na tomada, a máquina não suspende sozinha**; o que não pode acontecer
+  é desligar, hibernar ou fechar a tampa. Sem admin nesta máquina, não altero plano
+  de energia (nem excluo o projeto do Defender).
+- **Escopo científico intacto:** nenhum budget, dado, config, métrica ou resultado
+  existente foi alterado. `--max-workers` só define o número de processos paralelos
+  (`tests/test_parallel.py` cobre a equivalência sequencial × paralelo); cada
+  branch é independente e determinística por candidato.
+- Arquivos: `TASK.md` (esta entrada + B3/B4), `runs\screen_20260924T174217246692Z\`
+  (run vigente), `runs\screen_20260924T173651761759Z\` (órfã, preservada).
 - PC: C206-EDUC-333
 
