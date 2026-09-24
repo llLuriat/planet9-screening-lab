@@ -3,21 +3,24 @@
 Este projeto é uma pipeline científica auditável (triagem dinâmica de
 candidatos ao Planeta Nove). Precisão, rastreabilidade e honestidade
 epistêmica pesam mais que velocidade. Estas regras valem para QUALQUER
-perfil do Cline (Auditor ou Executor) rodando neste repositório.
+agente executor (Cline, Hermes, Antigravity, ou outro), em qualquer
+perfil (Auditor ou Executor), rodando neste repositório.
 
 ## Ambiente
-- Pasta do projeto: H:\planet9-screening-lab (NUNCA D:\ — corrigido em
-  2026-09, o repositório vive num pendrive usado em dois PCs diferentes,
-  nunca simultaneamente; a letra de unidade é sempre H:\ em ambas as
-  máquinas, independentemente de como o Windows rotulou outros discos
-  daquele PC).
+- Pasta do projeto: confirme o caminho real do projeto no início de cada
+  sessão (pwd/Get-Location) — o repositório já foi usado em pelo menos
+  3 máquinas/caminhos diferentes (H:\planet9-screening-lab,
+  D:\planet9-screening-lab, D:\ATLETA DO ANO\planet9-screening-lab).
+  Nunca assuma uma letra de unidade ou caminho fixo; use sempre o
+  caminho detectado nesta sessão.
 - venv já ativo antes de qualquer sessão. Se `python main.py doctor` falhar
   ou o venv parecer quebrado (Python não encontrado, base ausente), pare e
   reporte antes de tentar reconstruir sozinho às cegas.
-- H:\_tmp_ossos_survey (se presente) é um clone de referência READ-ONLY
-  (código-fonte Fortran do OSSOS SurveySimulator, usado como base para
-  portes fiéis como planet9lab/geometry/poly_footprint.py). Nunca editar
-  ou deletar nada ali.
+- O clone de referência OSSOS (código-fonte Fortran do SurveySimulator,
+  usado como base para portes fiéis como
+  planet9lab/geometry/poly_footprint.py), se presente nesta máquina
+  (verifique com Test-Path antes de assumir o caminho), é READ-ONLY.
+  Nunca editar ou deletar nada ali.
 
 ## Gate obrigatório (início e fim de toda tarefa)
 1. `python -m pytest -q` → deve bater o número de testes já esperado
@@ -34,9 +37,9 @@ e reportar a saída literal.
 - Nunca acumular versões antigas de plano — sempre a versão vigente.
 - **Ao iniciar qualquer sessão (mesmo que pareça continuação de uma
   conversa anterior), releia TASK.md e rode `git log -5 --oneline` +
-  `git status` antes de agir.** O repositório alterna entre dois PCs via
-  pendrive: a sessão anterior pode ter rodado na outra máquina, então a
-  memória de conversa do Cline não é garantia de estado atualizado —
+  `git status` antes de agir.** O repositório circula entre várias
+  máquinas: a sessão anterior pode ter rodado em outra máquina, então a
+  memória de conversa do agente não é garantia de estado atualizado —
   só o disco é.
 
 ## Disciplina científica (herdada do artigo/política de conclusão do repo)
@@ -87,17 +90,17 @@ TASK.md, o perfil Executor não deve parar e esperar instrução — deve:
    TASK.md com a justificativa, em vez de simplesmente parar sem explicação.
 
 ## Rotação de modelo (quando os tokens/rate limit de um provedor acabarem)
-Não existe troca automática nativa do Cline entre modelos — a rotação é
-manual, mas o próprio Cline deve executá-la sozinho, sem esperar o usuário
-clicar. Modelos free disponíveis nesta conta, em ordem de prioridade:
-1. DeepSeek V4 Flash (`deepseek/deepseek-v4-flash`, 1M contexto).
-2. GLM-5.3-Flash — confirmar o ID exato no seletor na primeira troca e
-   registrar aqui.
-3. LongCat 2.0 — idem.
-4. Laguna S 2.1 — idem.
+A lista de modelos disponíveis varia por ferramenta/conta — o que importa
+é o princípio, não a lista específica. A troca pode ser manual ou
+automática, conforme a ferramenta, mas o agente deve executá-la
+sozinho, sem esperar o usuário clicar. Antes de trocar: escrever o
+estado atual em TASK.md (seção "Log de execução"), commitar todo
+trabalho em andamento (mesmo parcial, com mensagem indicando
+checkpoint), depois trocar de modelo. Ao assumir como novo modelo:
+reler TASK.md e `git log -5 --oneline` antes de continuar — nunca
+reiniciar do zero nem repetir trabalho já commitado.
 
-Antes de trocar: escrever o estado atual em TASK.md (seção "Log de
-execução"), commitar todo trabalho em andamento (mesmo parcial, com
-mensagem indicando checkpoint), depois trocar de modelo. Ao assumir como
-novo modelo: reler TASK.md e `git log -5 --oneline` antes de continuar —
-nunca reiniciar do zero nem repetir trabalho já commitado.
+(Nota histórica, não normativa — exemplo válido em uma sessão
+específica: em 2026-09, na conta Cline, os modelos free em ordem de
+prioridade eram 1. DeepSeek V4 Flash (`deepseek/deepseek-v4-flash`,
+1M contexto); 2. GLM-5.3-Flash; 3. LongCat 2.0; 4. Laguna S 2.1.)
