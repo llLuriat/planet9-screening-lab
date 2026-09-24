@@ -758,3 +758,38 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
 - **Tarefa C: segue NÃO AUTORIZADA** (a decisão agora tem custo atualizado: ~20,8–22,2 h de parede nesta máquina com workers).
 - Arquivos: `dashboard/app.py`, `docs/LIMITACOES.md`, `results/hardware_benchmark.json` (re-medição), `tests/test_dashboard_ux.py` (+5), `TASK.md` (esta entrada).
 - PC: LURIAT
+
+## 2026-09-24 — Cline (Executor) — PC C206-EDUC-333 (aluno.candeias) — Ambiente religado (Python+Git), benchmark REAL desta máquina e autorização registrada para a Tarefa C
+
+- **Contexto:** o pendrive foi levado para outra máquina (C206-EDUC-333, Intel i3-10100T, 2,92 GB de RAM, Windows PT-BR) e **nada rodava**: sem Python instalado (nenhum `python`/`py` no PATH nem no registro), sem Git, e `.venv\pyvenv.cfg` apontando para `C:\Users\lucas\...\Python311` (caminho do LURIAT). Autorização do usuário nesta sessão: *"o objetivo é rodar. está liberado para contornar e ou resolver."*
+- **Ambiente religado (nenhum código, dado, config científica ou resultado existente foi alterado):**
+  1. **Python 3.11.9 (x64)** instalado no perfil atual com o instalador oficial da python.org. O arquivo baixado tem MD5 `e8dcd502e34932eebcaf1be056d5cbcd`, **idêntico ao MD5 oficial** do "Windows installer (64-bit)" da página de release do 3.11.9 (verificado antes de instalar). Série 3.11 = mesma do venv ⇒ as extensões compiladas já presentes (`numpy 2.4.6`, `pandas 3.0.5`, `rebound 5.1.1`, `pydantic_core`) continuam válidas, **sem rebuild** do venv.
+  2. `.venv\pyvenv.cfg` corrigido para o Python desta máquina; original preservado em `.venv\pyvenv.cfg.bak_antes_fix_C206-EDUC-333` (mesmo procedimento dos consertos anteriores `..._ALLUNOSENAI` e `..._LURIAT`).
+  3. **Git 2.55.0** (MinGit portátil em `C:\Users\aluno.candeias\tools\MinGit`, adicionado ao PATH do usuário; `core.pager=cat` para funcionar em terminal não interativo). Não há privilégio de administrador nesta máquina (não foi possível, p.ex., excluir o projeto do Defender).
+- **`python main.py doctor`:** todos os itens `[OK]` (yaml 6.0.3, numpy 2.4.6, pandas 3.0.5, pydantic 2.13.5, typer 0.27.2, rich, **rebound com integração mínima real funcionando**, pytest 9.1.1, sem sombra local de `pytest/`). Única `[FALHA]`: `runs/latest_run.txt` aponta para `H:\...\smoke_20260914T040741873932Z` — ponteiro gravado em outra máquina; é o MESMO item já reportado em 2026-09-14 e será sobrescrito pela run nova.
+- **Benchmark REAL desta máquina (pré-requisito obrigatório da Tarefa C, seção acima):** `python scripts\benchmark_integration_cost.py --output results\hardware_benchmark_C206-EDUC-333.json` — arquivo **NOVO**; `results/hardware_benchmark.json` (medição do LURIAT) foi **preservado, não sobrescrito**.
+  - **Aviso metodológico (honestidade):** a 1ª medição deu **7.944,1 anos/s** e estava **contaminada** — rodou concorrente com o `pytest` (CPU disputada e RAM quase esgotada). Com a máquina ociosa, 3 execuções do próprio script deram **132.891,2 / 204.586,8 / 207.967,2 anos/s**. Como o script calibra em apenas 2000 anos (0,010–0,015 s ⇒ ruído alto), fiz uma **verificação independente** com o mesmo sistema de 10 partículas e janela longa: **197.371 yr/s (janela de 2e5 yr)** e **205.180 yr/s (janela de 1e6 yr)**. Valor adotado para decisão: **≈205.000 anos/s** (≈345.600 steps/s).
+  - **Projeção honesta (1 core):** 4 Gyr → **5,42 h/branch**, **10,83 h/par com/sem P9**, **≈54,2 h** para as 10 integrações (5 candidatos de `data/candidates_example.csv` × 2 branches; o `max_candidates: 8` do YAML não é atingido por este catálogo). Com workers (w_eff ~4) ⇒ **~13–14 h de parede**. `recommended_integration_years` = **4e9** (dentro do orçamento de 48 h/par).
+  - Comparação honesta entre máquinas para este workload: i5-14400 (2026-09-03) 347.886 anos/s > **C206-EDUC-333 ≈205.180** ≳ LURIAT (2026-09-15) 186.157 anos/s. Ou seja: esta máquina é **comparável à LURIAT**, não o gargalo que a medição contaminada sugeria.
+- **Gate (início e fim da tarefa):** `python -m pytest -q` → **230 passed** (baseline do repositório; 271,1 s) e `python -m ruff check .` → **All checks passed!**. Obs.: a primeira execução do pytest foi **abortada por engano** por mim (parecia travada; na verdade a saída estava em buffer de pipe quando canalizada para arquivo e o teste `test_benchmark_job_result_is_viewable_in_jobs` espera um benchmark real de até 180 s). Re-executada do zero, verbosa, sem falhas.
+- **Tarefa C — AUTORIZAÇÃO REGISTRADA (2026-09-24):** o usuário (dono/Auditor) autorizou nesta sessão, verbatim: *"o objetivo é rodar. está liberado para contornar e ou resolver."* Timestamp de início esperado: **2026-09-24 ~14:40 locais (17:40Z)**. O campo "AUTORIZAÇÃO PARA INICIAR" da seção da Tarefa C no Plano vigente **NÃO foi alterado** (aquela seção é do Auditor); o registro da autorização fica nesta seção, que o Executor pode editar, conforme `.clinerules`.
+- Arquivos: `.venv\pyvenv.cfg` (+ backup `.venv\pyvenv.cfg.bak_antes_fix_C206-EDUC-333`), `results/hardware_benchmark_C206-EDUC-333.json` (novo), `TASK.md` (esta entrada).
+- PC: C206-EDUC-333
+
+
+### Tarefa C — disparo da run secular: confirmado rodando (passos 1-4 do procedimento)
+
+- **Passo 1 (timestamp de início esperado registrado):** 2026-09-24 ~14:40 locais — ver entrada acima.
+- **Passo 2 (background):** disparado com `Start-Process` desacoplado (sintaxe validada antes de usar): `python main.py screen --budget configs/budgets/secular.yaml --max-workers 4`. Logs de stdout/stderr em `%TEMP%\p9_secular_run.log` / `.err` (nada extra foi criado dentro do repositório). **`--max-workers 4` = núcleos físicos do i3-10100T** — escolha consciente porque a máquina tem 2,92 GB de RAM com ~1 GB já consumido pelo VS Code; workers medidos em ~32 MB cada (folga confortável).
+- **Passo 3 (confirmação de que está rodando de fato, não só "o comando retornou"):**
+  - Run: **`runs\screen_20260924T173651761759Z`** (started_at `2026-09-24T17:36:52.71Z`).
+  - `config.resolved.yaml`: `integration_years: 4000000000.0`, `timestep_years: 0.593644`, `checkpoint_interval_years: 1000000.0` — é o budget secular pretendido, sem desvio.
+  - `status.json`: `status: running`, `candidates_total: 5` (4 gigantes + 4 ETNOs carregados); `heartbeat.json` gravado.
+  - `events.log`: `run_started` → `data_loaded` → `candidate_started` (5 candidatos).
+  - Árvore de processos: PID 8804 (launcher do venv) → 7948 (gerência) → **4 workers** (8500, 8308, 10768, 1512).
+  - `checkpoints\` já contém `.bin` + séries `.csv` dos primeiros candidatos (checkpointing funcionando).
+- **Passo 4/5 (custo e monitoramento):** custo esperado ≈54,2 h de CPU (10 integrações × 5,42 h/branch) ⇒ **~13–14 h de parede** com 4 workers. Checkpoint a cada 1e6 anos ≈ 126 s de integração, então uma queda custa no máximo ~2 min de trabalho; se a máquina for desligada, retomar com `python main.py resume runs\screen_20260924T173651761759Z --max-workers 4` (comando `resume` confirmado no `cli.py`; só candidatos pendentes são refeitos).
+- **Passo 6 (ao terminar):** registrar `SUCCESS.marker`/`status.json`/`results\ranking.csv` aqui e sinalizar em "Bloqueios" que a atualização do artigo está pronta para revisão — **sem** atualizar o artigo sozinho.
+- Arquivos: `TASK.md` (esta entrada), `results/hardware_benchmark_C206-EDUC-333.json`, `runs\screen_20260924T173651761759Z\` (artefatos da run).
+- PC: C206-EDUC-333
+
