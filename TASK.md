@@ -347,7 +347,7 @@ acidental) e ` D docs/PLANET9_ARTIGO_v2_ABNT.docx` + `?? docs/archive/PLANET9_AR
 **Nada disso foi commitado, revertido ou movido por mim.** Aguardando decisão do
 Auditor/usuário (ex.: `git add` do move + reverter o espaço do `.gitignore`).
 
-### B5 — A run de 4 Gyr CONCLUIU, mas 4 dos 5 candidatos ficaram INVÁLIDOS por um bug de pós-processamento (`float(None)` lendo CSV ragged) — precisa de decisão do Auditor
+### B5 — A run de 4 Gyr CONCLUIU, mas 4 dos 5 candidatos ficaram INVÁLIDOS por um bug de pós-processamento (`float(None)` lendo CSV ragged) — RESOLVIDO (corrigido + recuperado em 2026-09-25)
 
 Descoberto em 2026-09-25 ao verificar a run `screen_20260924T174217246692Z` (o PC
 apareceu desligado; ver Log desta data). **Resumo: a FÍSICA terminou 100% (as 10
@@ -418,16 +418,58 @@ a run — o bug é invisível para as checagens atuais.
 - O que **não** existe hoje é um caminho de "reprocessar a partir dos checkpoints":
   `planet9lab/rescore.py` L18 só relê `results/ranking.csv` (não toca `.bin`/CSVs).
 
-**Opções para o Auditor (não corrigido — é mudança de pipeline)**
-- (a) Correção mínima + reprocesso: tratar `None`/`""` como "ETNO perdido" em
+**Opções que foram apresentadas para o Auditor (a opção (a) foi EXECUTADA — ver RESOLUÇÃO abaixo; (b) e (c) descartadas)**
+- (a) **[EXECUTADA]** Correção mínima + reprocesso: tratar `None`/`""` como "ETNO perdido" em
   `engine.py` L413 **e** fixar o cabeçalho uma única vez com a união dos nomes de ETNO
   (defesa em profundidade); somado a um caminho de reprocessamento a partir dos
   `.bin`/CSVs desta run, os 5 candidatos ficam completos em **minutos**, sem re-integrar.
 - (b) Correção mínima + nova run `screen` do zero: resultado garantido, custo ≈ 11 h.
 - (c) Deixar como está: rejeitado do ponto de vista científico (perde-se 80% da run).
 
-**Nada foi alterado por mim**: nenhum `.py`, config, dado ou resultado existente. A
-correção e/ou o reprocesso exigem autorização explícita.
+**RESOLUÇÃO (2026-09-25, Executor — opção (a) autorizada pelo usuário): CORRIGIDO + RECUPERADO, sem re-integrar.**
+
+1. **Correção em `planet9lab/engine.py` (6 edições):** `_optional_float()` trata `""`/`None`
+   como "sem dado"; `pomega_fieldnames` fixo (`["t_years"] + sorted(...)`) para a série ter
+   sempre a largura do cabeçalho; leitor da série tolera células ausentes/extra (nada de
+   `float(None)`); drift de energia/momento angular relido do disco quando a branch é
+   retomada já no alvo (antes saía `None`); import de `write_csv`; e o novo método
+   **`rebuild_delta_pomega_series(etnos, candidate, checkpoint_dir)`**, que regenera a série
+   `with_p9` direto do SimulationArchive. Motivo: o CSV legado é **posicionalmente
+   corrompido** (em linha curta, `csv.DictReader` atribui as células ao ETNO errado) — ele
+   não pode ser apenas relido, tem que ser reconstruído.
+2. **Testes novos:** `tests/test_pomega_series_robustness.py` — 5 testes (largura fixa com
+   ETNO ejetado; CSV ragged legado sem crash + drift vindo do disco; rebuild == cálculo
+   live célula a célula; sem archive → `None`; `_optional_float`). Gate: `ruff check .`
+   limpo; `pytest -q` = **235 passed** (230 prévios + 5 novos).
+3. **Scripts novos:** `scripts/rebuild_pomega_series.py` (rebuild + verificação contra o
+   archive: nº de linhas, largura fixa, tempos idênticos) e `scripts/reprocess_run.py`
+   (orquestra: rebuild → zera cache/status dos `failed` para `pending` com backup →
+   `resume_run`). O `resume` só recalcula candidatos pendentes e re-finaliza tudo.
+4. **Reprocesso executado** em `runs/screen_20260924T174217246692Z`
+   (`python scripts/reprocess_run.py --run <run>`): as **4 séries reconstruídas → "OK:
+   4000 linhas, 5 colunas, tempos idênticos ao archive"**; backups em
+   `*.pre_reprocess_20260925T164723Z` (cache, status e as 4 séries originais); eventos
+   `reprocess_*` em `events.log`. O `resume` levou **~16 s** (só pós-processamento: nenhum
+   `.bin` foi tocado — os 5 archives seguem com **4001 snapshots e t_final = 4,000000000e9 yr**).
+5. **Resultado final (auditoria):** `results/ranking.csv` com **5/5 candidatos e métricas
+   completas** — 1º `p9_low_mass_weak` (completed/candidate_of_interest, δ 0,159918,
+   **inalterado**); 2º-5º `p9_high_mass_family` (δ +0,007727), `p9_mid_mass_aligned`
+   (−0,098559), `p9_bad_geometry` (−0,138289), `p9_inner_unstable` (−0,175539) — todos
+   **failed/rejected por `survival_rate_below_threshold`** (sobrevivência com P9:
+   0,5 / 0,5 / 0,25 / 0,25; controle `without_p9` idêntico nos 5: sobrevivência 1,0,
+   δ dinâmico 0,598227). Drift de energia com P9 ~1,2–2,7e-6 (saudável). `status.json` →
+   `completed`, `candidates_done: 5`, `SUCCESS.marker` e **`python main.py audit-run` →
+   AUDIT OK**.
+6. **Ressalvas para o artigo (importante):** (i) usar o **novo** ranking — o antigo tinha
+   4 linhas vazias e publicaria resultado cientificamente errado; (ii) o
+   `apsidal_clustering_R` dos 4 rejeitados é calculado sobre 1–2 ETNOs sobreviventes
+   (R = 1,0 / 0,82158 etc. **não** é evidência de alinhamento — estão `rejected`);
+   (iii) o `operational_status = failed` dos 4 é a política existente "ETNO perdido →
+   `numerical_failures`" (não é um bug novo; `numerical_health_score = 0` acompanha);
+   (iv) os tracebacks antigos permanecem em `audit/crash_log.jsonl` como forense do bug.
+7. **Auditoria/reversibilidade:** nada foi apagado — cache, status e séries originais
+   guardados como `*.pre_reprocess_20260925T164723Z`; o pipeline de reprocesso é
+   reproduzível pelo comando acima. Nenhum `.docx`/artigo foi tocado.
 
 **Fato de infraestrutura relacionado (não afetou a run):** o Event Log do Windows
 registra desligamento **inesperado** (`Event ID 6008`) às **08:08:34 de 25/09** e
@@ -1047,4 +1089,49 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
   o número honesto por candidato é `~5,5 h (without_p9) + ~7,3 h (with_p9) ≈ 12,8 h`,
   e não 10,8 h. Sugestão para o Auditor: recalibrar/rotular o benchmark com as duas
   configurações ou aplicar o fator ~1,33 em branches que incluam o P9.
+
+
+### 2026-09-25 17:05Z Cline (Executor) — Correção do B5 + recuperação dos 4 candidatos da run secular (opção (a), sem re-integrar)
+
+- Status: concluído
+- O que foi feito / resultado real:
+  - **Correção (6 edits em `planet9lab/engine.py`):** `_optional_float` (`""`/`None` →
+    "sem dado"), `pomega_fieldnames` fixo (`["t_years"] + sorted(...)`, série sempre com a
+    largura do cabeçalho), leitor robusto da série (células ausentes/extra nunca viram
+    `float(None)`), drift de energia/momento angular relido do disco quando a branch é
+    retomada já no alvo (antes saía `None`), `write_csv` importado e o método novo
+    `rebuild_delta_pomega_series(etnos, candidate, checkpoint_dir)` que regenera a série
+    `with_p9` direto do SimulationArchive — o CSV legado é **posicionalmente corrompido**
+    (em linha curta as células são atribuídas ao ETNO errado), reler não basta.
+  - **Testes novos:** `tests/test_pomega_series_robustness.py` — 5 testes (largura fixa com
+    ETNO ejetado e política `failed`/`lost_etnos`; CSV ragged legado sem crash + drift vindo
+    do disco na retomada; rebuild reproduz o cálculo live célula a célula com `abs=1e-9`;
+    sem archive → `None`; `_optional_float`), reutilizando o stub de REBOUND de
+    `tests/test_checkpointing.py`.
+  - **Scripts novos:** `scripts/rebuild_pomega_series.py` (rebuild + verificação contra o
+    archive: nº de linhas, largura fixa, tempos ≤1e-6 yr) e `scripts/reprocess_run.py`
+    (rebuild → reset `failed`→`pending` com backup → `resume_run`), ambos com `--dry-run`.
+  - **Reprocesso real** em `runs/screen_20260924T174217246692Z` (16:47–16:48Z): as 4 séries
+    reconstruídas → **"OK: 4000 linhas, 5 colunas, tempos idênticos ao archive"**; 6 backups
+    `*.pre_reprocess_20260925T164723Z` (cache, status, 4 séries); eventos `reprocess_*` em
+    `events.log`; o `resume` reprocessou os 4 candidatos em **~16 s** (só pós-processamento).
+    **Nenhum `.bin` foi alterado:** os 5 archives seguem com **4001 snapshots e
+    t_final = 4,000000000e9 yr** (verificado por `Simulationarchive`).
+  - **Resultado:** `results/ranking.csv` com **5/5 candidatos e métricas completas** —
+    `p9_low_mass_weak` intacto (1º, δ 0,159918, completed/candidate_of_interest); os 4 de
+    volta como `failed/rejected` por `survival_rate_below_threshold` (sobrevivência com P9
+    0,5 / 0,5 / 0,25 / 0,25; δ de +0,007727 a −0,175539; controle `without_p9` idêntico
+    nos 5); `status.json` → completed / `candidates_done: 5`; `SUCCESS.marker`;
+    `python main.py audit-run` → **AUDIT OK**. Ressalvas para o artigo (R com 1–2 ETNOs
+    sobreviventes; `operational_status=failed` é a política existente) em **B5 §6**.
+  - **Gate (fim desta tarefa):** `ruff check .` limpo + `pytest -q` → **235 passed**
+    (230 prévios + 5 novos), re-executados nesta máquina.
+  - **Arquivos tocados:** `planet9lab/engine.py`, `tests/test_pomega_series_robustness.py`
+    (novo), `scripts/rebuild_pomega_series.py` (novo), `scripts/reprocess_run.py` (novo),
+    `TASK.md` (B5 → RESOLVIDO + esta entrada). Artefatos da run alterados pelo próprio
+    reprocesso (ranking/status/report/séries + backups). **B3 e B4 continuam abertos**;
+    nenhum `.docx`/artigo tocado.
+- Commit: `fix(engine): B5 corrigido e run secular recuperada - serie delta_pomega com largura fixa + rebuild a partir do SimulationArchive; 4/5 candidatos de volta ao ranking sem re-integrar (5 testes novos, scripts de rebuild/reprocesso, audit-run OK)`
+- Próximo passo: Auditor adotar o **novo** ranking no artigo (o antigo tem 4 linhas vazias) e decidir B3/B4.
+- PC: C206-EDUC-333
 

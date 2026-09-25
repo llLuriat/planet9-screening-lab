@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from .artifacts import append_csv_row, read_csv_dicts
+from .artifacts import append_csv_row, read_csv_dicts, write_csv
 from .constants import DEG_TO_RAD, RAD_TO_DEG, earth_mass_to_solar_mass, normalize_degrees
 from .metrics import (
     compute_branch_metrics,
@@ -37,6 +37,23 @@ def rebound_available() -> bool:
 
 def vec_norm(vec: Any) -> float:
     return math.sqrt(float(vec.x) ** 2 + float(vec.y) ** 2 + float(vec.z) ** 2)
+
+
+def _optional_float(value: Any) -> float | None:
+    """Convert a CSV cell into a float, treating absent cells as "no data".
+
+    `csv.DictReader` yields the string "" for a present-but-empty cell and
+    ``None`` for a column that a short ("ragged") row is missing entirely; both
+    mean "this value is not available here" and must be skipped instead of
+    reaching ``float()``, which raises and used to discard a whole candidate
+    after a multi-hour integration (see the Delta_pomega series reader).
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 class ReboundEngine:
@@ -357,6 +374,14 @@ class ReboundEngine:
         interval = self.budget.checkpoint_interval_years
         energy_drift_rel = None
         angular_drift_rel = None
+        # Fixed Delta_pomega column set (one column per catalog ETNO, in name
+        # order): an ETNO that is ejected at some checkpoint leaves an EMPTY
+        # cell, never a missing column. Recomputing this list from each
+        # checkpoint's instantaneous keys made the file ragged (later rows
+        # narrower than the header); csv.DictReader then returned None for the
+        # missing columns and float(None) killed the whole candidate during
+        # post-processing, i.e. after the integration had already finished.
+        pomega_fieldnames = ["t_years"] + sorted(etno.name for etno in etnos)
 
         while sim.t < target - 1e-9:
             t_next = min(sim.t + interval, target)
@@ -397,10 +422,22 @@ class ReboundEngine:
                 }
                 instant = delta_pomega_instant(instant_orbits, p9_dict)
                 if instant:
-                    fieldnames = ["t_years"] + sorted(instant.keys())
-                    row = {"t_years": sim.t, **instant}
-                    append_csv_row(pomega_series_path, row, fieldnames)
+                    append_csv_row(pomega_series_path, {"t_years": sim.t, **instant}, pomega_fieldnames)
             sim.save_to_file(str(archive_path))
+
+        # A resumed branch whose snapshot already sits at (or past) the target
+        # skips the loop above, and an integration failure breaks out of it
+        # early: in both cases the drift state must come from the durable series
+        # on disk. Reporting None for a fully integrated branch would silently
+        # empty its metrics on the very recovery path this engine advertises.
+        if (energy_drift_rel is None or angular_drift_rel is None) and drift_series_path.exists():
+            drift_rows = read_csv_dicts(drift_series_path)
+            if drift_rows:
+                last_drift = drift_rows[-1]
+                if energy_drift_rel is None:
+                    energy_drift_rel = _optional_float(last_drift.get("energy_drift_rel"))
+                if angular_drift_rel is None:
+                    angular_drift_rel = _optional_float(last_drift.get("angular_momentum_drift_rel"))
 
         final_orbits, lost_etnos = self._extract_final_orbits(sim, etnos, etno_start_index, failures)
 
@@ -410,9 +447,13 @@ class ReboundEngine:
             series_by_etno: dict[str, list[float]] = {}
             for row in series_rows:
                 for key, value in row.items():
-                    if key == "t_years" or value == "":
+                    # key None = extra cells beyond the header; "" / None = cells a
+                    # short (ragged) row is missing. Both mean "not available", and
+                    # neither is a number to convert.
+                    number = _optional_float(value)
+                    if key is None or key == "t_years" or number is None:
                         continue
-                    series_by_etno.setdefault(key, []).append(float(value))
+                    series_by_etno.setdefault(key, []).append(number)
             delta_pomega_result = delta_pomega_stability(series_by_etno)
             delta_pomega_result["_raw_series"] = series_by_etno
 
@@ -428,6 +469,63 @@ class ReboundEngine:
             etnos,
             delta_pomega_stability_result=delta_pomega_result,
         )
+
+    def rebuild_delta_pomega_series(
+        self,
+        etnos: list[ETNORecord],
+        candidate: P9Candidate,
+        checkpoint_dir: str | Path,
+    ) -> Path | None:
+        """Recompute the with_p9 Delta_pomega series from the SimulationArchive.
+
+        The series is a *derived* quantity: every snapshot stored in
+        `<candidate>_with_p9.bin` carries the full N-body state, so the per-ETNO
+        Delta_pomega values can be recomputed exactly the way the live run
+        computed them. This is the recovery path for runs whose CSV was written
+        before 2026-09-25: back then the column set was recomputed per
+        checkpoint, so a checkpoint at which an ETNO had been ejected produced a
+        row narrower than the header. When such a file is read back,
+        `csv.DictReader` maps cells positionally and therefore attributes the
+        surviving values to the WRONG ETNO names (information that cannot be
+        recovered from the file itself). Rewriting the series from the archive
+        restores a trustworthy, fixed-width file that the normal
+        `run_branch_checkpointed` post-processing can consume as-is.
+
+        Returns the rewritten path, or None when there is nothing to rebuild
+        (no archive, or no ETNO left to compare at any checkpoint).
+        """
+        import rebound
+
+        checkpoint_dir = Path(checkpoint_dir)
+        archive_path = checkpoint_dir / f"{candidate.candidate_id}_with_p9.bin"
+        if not archive_path.exists():
+            return None
+        series_path = checkpoint_dir / f"{candidate.candidate_id}_with_p9_delta_pomega_series.csv"
+        etno_start_index = 1 + len(self.giants) + 1
+        fieldnames = ["t_years"] + sorted(etno.name for etno in etnos)
+
+        rows: list[dict] = []
+        archive = rebound.Simulationarchive(str(archive_path))
+        for index in range(len(archive)):
+            sim = archive[index]
+            if sim.t <= 0:
+                # Matches the live run: the t=0 snapshot is written before the
+                # checkpoint loop, so it has no Delta_pomega row.
+                continue
+            instant_orbits, _ = self._extract_final_orbits(sim, etnos, etno_start_index, [])
+            p9_orbit = sim.particles[1 + len(self.giants)].orbit(primary=sim.particles[0])
+            p9_dict = {
+                "omega_deg": normalize_degrees(float(p9_orbit.omega) * RAD_TO_DEG),
+                "Omega_deg": normalize_degrees(float(p9_orbit.Omega) * RAD_TO_DEG),
+            }
+            instant = delta_pomega_instant(instant_orbits, p9_dict)
+            if instant:
+                rows.append({"t_years": sim.t, **instant})
+
+        if not rows:
+            return None
+        write_csv(series_path, rows, fieldnames)
+        return series_path
 
     def _run_analytical_invalid(
         self,
