@@ -1179,3 +1179,43 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
 - Commit: pendente nesta entrada (commits por etapa conforme forem concluídos).
 - PC: C206-EDUC-333
 
+### 2026-09-25 18:40Z Cline (Executor) — PC C206-EDUC-333 — Checkpoint da campanha (1 h): 4 primeiros jobs OK, screen Quadro2@4Gyr rodando, B3 corrigido
+
+- Commits desta etapa: `84894fd` (B4), `180af40` (B3 + teste), `026f827`
+  (infra da campanha). Gate antes do lançamento: **236 passed + ruff limpo**.
+- **B3 RESOLVIDO**: `resume_run` reconstrói `audit/run_manifest.json` ausente
+  a partir de `data_manifest.json` (os 6 hashes que o `audit-run` exige),
+  `replay_command.txt` (command + seed), `events.log` (timestamp real) e
+  `config.resolved.yaml`; evento `manifest_reconstructed` fica no events.log e
+  a finalização regrava o manifesto completo por cima. Teste novo
+  `test_resume_reconstructs_manifest_for_interrupted_run` (236 = 235 + 1).
+  Pasta órfã `screen_20260924T173651761759Z` mantida intacta e agora seria
+  **retomável** se o Auditor decidir usá-la (decisão pendente: apagar /
+  marcar / retomar).
+- **Campanha rodando**: supervisor desde 17:39Z. smoke ✓ (6,7 s), grid angle
+  ✓ (35,7 s), grid i ✓ (33,5 s), **screen Quadro2 @4 Gyr desde 17:40Z**
+  (run `screen_20260925T174027769815Z`, 8 candidatos, 5 workers, ETA
+  ~12:50Z em 26/09 ≈ 19 h; fila total projetada cabe nas 48 h).
+- **Resultados dos grids @1 Myr (35 s cada):**
+  - `angle_robustness`: os 5 ω (0/90/180/200/270) TODOS passam como
+    `candidate_of_interest`; Δ varia 0,0996–0,1465 (≈40 % de variação);
+    ordem ω270≈ω0 > ω200 > ω180 > ω90; R_apsidal ≈ 0,30 em todos.
+    Claim: estabilidade do **sinal** do screen em ω com sensibilidade de
+    magnitude — escopo 1 Myr, não alinhamento secular.
+  - `i_boundary_scan`: i31–35 praticamente idênticos (Δ 0,1108–0,1116,
+    <1 %) — **nenhuma transição na fronteira i = 30° a 1 Myr**; a corte da
+    linha-4 não é dinâmica neste horizonte (reportar com esse escopo).
+- Diagnósticos extras na run 174217: `circular-stats` (2 significant by
+  Rayleigh with_p9 de 4 ETNOs), `selection-bias-check` ✓, `candidate-families`
+  ✓, `diagnose-scoring` ✓ (artefatos em `runs/.../diagnostics|analysis`) e
+  `report` re-gerado com eles.
+- **Propostas para o Auditor (não implementadas — envolvem decisão de
+  categoria B / época):** (P-a) integrar
+  `sky_projection.orbital_elements_to_radec` em `generate_synthetic_population`
+  como opt-in com **época explícita obrigatória** (LIMITACOES, nota
+  2026-09-13); (P-b) estabilidade entre seeds REAL (auditoria V3 P1-2:
+  `write_seed_stability` só replica o mesmo rank por seed); (P-c)
+  detectabilidade e propagação de incerteza seguem fora do escopo (pendências
+  declaradas, não esquecidas).
+- PC: C206-EDUC-333
+
