@@ -338,7 +338,7 @@ mas esse arquivo só é gravado na **FINALIZAÇÃO** da run (`run.py` L991, junt
   `RUNNING.lock`). Precisa de decisão: apagar, marcar como abandonada, ou usar
   como base se o B3 for corrigido.
 
-### B4 — Alterações NÃO commitadas que já existiam antes desta sessão (não são minhas)
+### B4 — Alterações NÃO commitadas que já existiam antes desta sessão (não são minhas) — RESOLVIDO (usuário autorizou comitar em 2026-09-25)
 
 Já no estado inicial (primeiro `git status` desta máquina, após religar o Git):
 ` M .gitignore` (um espaço extra antes do comentário da 1ª linha — edição
@@ -346,6 +346,11 @@ acidental) e ` D docs/PLANET9_ARTIGO_v2_ABNT.docx` + `?? docs/archive/PLANET9_AR
 (documento movido para `docs/archive/` em 2026-09-13 sem `git add`/`git mv`).
 **Nada disso foi commitado, revertido ou movido por mim.** Aguardando decisão do
 Auditor/usuário (ex.: `git add` do move + reverter o espaço do `.gitignore`).
+
+**RESOLVIDO (2026-09-25):** o usuário autorizou comitar ("o git agora está
+instalado... pode comitar"). O espaço do `.gitignore` foi revertido e o move do
+docx para `docs/archive/` commitado como rename, no commit `chore` desta sessão
+(ver Log — campanha de 48 h).
 
 ### B5 — A run de 4 Gyr CONCLUIU, mas 4 dos 5 candidatos ficaram INVÁLIDOS por um bug de pós-processamento (`float(None)` lendo CSV ragged) — RESOLVIDO (corrigido + recuperado em 2026-09-25)
 
@@ -1133,5 +1138,44 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
     nenhum `.docx`/artigo tocado.
 - Commit: `1da1078` (código, testes, scripts e TASK.md até esta linha); esta atualização do Log: commit `docs(task)` seguinte.
 - Próximo passo: Auditor adotar o **novo** ranking no artigo (o antigo tem 4 linhas vazias) e decidir B3/B4.
+- PC: C206-EDUC-333
+
+### 2026-09-25 18:00Z Cline (Executor) — PC C206-EDUC-333 — Campanha de 48 h autorizada pelo usuário (máximo de simulações + fidelidade); B4 fechado
+
+- Status: em andamento (entrada de ABERTURA; fechamento virá em entrada própria)
+- **Autorização (usuário, 2026-09-25):** o usuário se ausenta por 2 dias e delegou:
+  permissão para corrigir/recuperar dados da simulação, programar comandos e comitar;
+  objetivos: rodar o MÁXIMO de simulações e afinar o simulador para ser fiel e
+  coerentemente científico; economizar tokens para não interromper o funcionamento.
+- **Estado inicial validado:** `git log` = d10dfb3 (B5 fechado); gate 235 passed +
+  ruff limpo; `python main.py doctor` OK (REBOUND real, `runs/latest_run.txt` acessível).
+- **B4 FECHADO** (autorização acima): espaço extra do `.gitignore` revertido; move do
+  docx para `docs/archive/` commitado como rename.
+- **Fila de jobs planejada (proposta do Executor — sem Auditor ativo, ver .clinerules
+  seção "Continuidade"):**
+  1. Fix do B3: `resume` reconstrói o manifesto a partir de `config.resolved.yaml` +
+     `candidates_input.csv` + `events.log` quando ele faltar (só finalização grava);
+     teste dedicado.
+  2. `smoke` + grids de sensibilidade (`angle_robustness`, `i_boundary_scan`) @1e6 (minutos).
+  3. **`screen --budget secular --candidates data/candidates_quadro2.csv --max-workers 5`
+     (~19 h): os 8 candidatos do Quadro 2 a 4 Gyr** — o run de 20260924 usou
+     `candidates_example` (5 linhas), portanto a discriminação BB16 vs BB21 do artigo
+     ainda NÃO foi integrada a 4 Gyr. Comando = replay do 174217 + `--candidates`.
+  4. Base de robustez @1e8 (`screen` com `candidates_example`, ~20 min) — a suíte
+     convergence/IAS15/loo a 4e9 é inviável (dt/4 ≈ 48 h/par), então os estudos de
+     fidelidade rodam em horizonte 1e8 e são reportados com esse escopo.
+  5. Suíte de robustez nessa base (convergence, validate-top/IAS15, leave-one-out,
+     null-models).
+  6. Monte Carlo funil completo: config NOVO copiado de `parameter_space.yaml` com
+     `max_stage3_samples: 60` (pendência registrada em LIMITACOES; preserva o original).
+  7. MEGNO limitado (`--years`) + diagnósticos baratos (circular-stats,
+     selection-bias-check, diagnose-*) nas runs novas.
+  8. Gate final (pytest + ruff) + entrada de fechamento com números reais.
+- Supervisor em background: `scripts/campaign_supervisor.py` — fila sequencial,
+  isola falha de cada job, 1 retry automático via `resume` (só é seguro por causa do
+  fix do B3), logs/progresso em `runs/campaign_supervisor/`; tentativa de impedir
+  sleep da máquina via `powercfg`.
+- Ressalvas B5 §6 seguem valendo; artigo NÃO será tocado nesta campanha.
+- Commit: pendente nesta entrada (commits por etapa conforme forem concluídos).
 - PC: C206-EDUC-333
 
