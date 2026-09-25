@@ -1146,6 +1146,65 @@ def run_montecarlo_scan(
     return run_dir
 
 
+def _reconstruct_missing_manifest(run_dir: Path, config_path: Path) -> dict:
+    """Reconstrói o manifesto mínimo de uma run INTERROMPIDA (correção de B3).
+
+    Antes da correção, `audit/run_manifest.json` só era gravado na finalização
+    (write_outputs), então uma run interrompida ficava sem manifesto e o
+    `resume` abortava antes de chegar nos checkpoints. Recupera de disco o que
+    a própria run gravou ao iniciar:
+    - hashes: `data_manifest.json` (gravado em run_started; é de lá que o
+      `audit-run` lê os 6 hashes obrigatórios, repassados por write_outputs);
+    - command: token após main.py em `replay_command.txt`;
+    - timestamp: primeiro evento `run_started` do `events.log`;
+    - seed/budget: `config.resolved.yaml`.
+    Campos ausentes caem nos fallbacks de `resume_run`; a finalização
+    sobrescreve este arquivo com o manifesto completo.
+    """
+    config = load_yaml(config_path)
+    budget = BudgetConfig.model_validate(config["budget"])
+    command = "screen"
+    seed = budget.seeds[0]
+    replay_path = run_dir / "replay_command.txt"
+    if replay_path.exists():
+        tokens = replay_path.read_text(encoding="utf-8").strip().split()
+        if len(tokens) >= 3 and tokens[1].endswith("main.py"):
+            command = tokens[2]
+        if "--seed" in tokens:
+            try:
+                seed = int(tokens[tokens.index("--seed") + 1])
+            except (ValueError, IndexError):
+                seed = budget.seeds[0]
+    timestamp = utc_now()
+    events_path = run_dir / "events.log"
+    if events_path.exists():
+        for line in events_path.read_text(encoding="utf-8").splitlines():
+            try:
+                payload = json.loads(line)
+            except ValueError:
+                continue
+            if payload.get("event") == "run_started" and payload.get("timestamp"):
+                timestamp = payload["timestamp"]
+                break
+    hashes: dict = {}
+    data_manifest_path = run_dir / "data_manifest.json"
+    if data_manifest_path.exists():
+        try:
+            raw = json.loads(data_manifest_path.read_text(encoding="utf-8"))
+            hashes = raw.get("hashes", {}) or {}
+        except (ValueError, AttributeError, TypeError):
+            hashes = {}
+    return {
+        "run_id": run_dir.name,
+        "command": command,
+        "timestamp": timestamp,
+        "seed": seed,
+        "hashes": hashes,
+        "budget": budget.model_dump(),
+        "reconstructed_by": "resume_manifest_reconstruction (B3 fix)",
+    }
+
+
 def resume_run(run_dir: str | Path, max_workers: int | None = None) -> dict:
     """Actually resume a run, not just report on it.
 
@@ -1190,12 +1249,18 @@ def resume_run(run_dir: str | Path, max_workers: int | None = None) -> dict:
     manifest_path = run_dir / "audit" / "run_manifest.json"
     config_path = run_dir / "config.resolved.yaml"
     candidates_input_path = run_dir / "candidates_input.csv"
-    if not (manifest_path.exists() and config_path.exists() and candidates_input_path.exists()):
+    if not (config_path.exists() and candidates_input_path.exists()):
         raise FileNotFoundError(
-            f"Cannot resume {run_dir}: missing one of audit/run_manifest.json, "
-            "config.resolved.yaml, candidates_input.csv (needed to reconstruct "
-            "the exact run configuration)."
+            f"Cannot resume {run_dir}: missing one of config.resolved.yaml, "
+            "candidates_input.csv (needed to reconstruct the exact run "
+            "configuration)."
         )
+    if not manifest_path.exists():
+        # B3: runs interrompidas não têm manifesto (só a finalização gravava).
+        # Reconstrói a partir dos artefatos do início da run e registra o
+        # evento; a finalização reescreve o manifesto completo por cima.
+        write_json(manifest_path, _reconstruct_missing_manifest(run_dir, config_path))
+        append_event(run_dir, "manifest_reconstructed", method="b3_resume_fix")
     manifest = read_manifest(run_dir)
     config = load_yaml(config_path)
     budget = BudgetConfig.model_validate(config["budget"])
