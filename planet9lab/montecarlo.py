@@ -294,7 +294,12 @@ def run_scan(
     for _point, row in stage3_skipped:
         row["stage3_apsidal_alignment"] = "not_evaluated_capacity_limit"
 
-    secular_budget = load_budget(str(ROOT / "configs" / "budgets" / "secular.yaml"))
+    # Estágio 3: orçamento configurável (era hard-coded em secular.yaml, que hoje
+    # é 4e9 yr — inviável para 60 branches; as scans BB16/BB21 rodaram stage 3 a
+    # 1e8 exatamente porque secular.yaml foi rebaixado temporariamente na época).
+    # Padrão preservado: sem a chave no YAML, continua usando secular.yaml.
+    stage3_budget_path = config.get("stage3_budget", str(ROOT / "configs" / "budgets" / "secular.yaml"))
+    secular_budget = load_budget(stage3_budget_path)
     secular_engine = ReboundEngine(secular_budget, seed, giants, allow_analytical_fallback=False)
     checkpoint_dir = ensure_dir(run_dir / "montecarlo_checkpoints")
 

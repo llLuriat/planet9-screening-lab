@@ -1,0 +1,72 @@
+{
+  "campaign": "48h_20260925_max_simulacoes_fidelidade",
+  "notes": [
+    "Fila da campanha (ver TASK.md Log 2026-09-25 18:00Z). O supervisor relê este arquivo a cada job: pode podar/reordenar entradas ainda nao executadas.",
+    "{py} = python do venv; {latest_run} = conteudo de runs/latest_run.txt no momento do job.",
+    "Ordem: sanity + grids baratos -> screen Quadro2 a 4 Gyr (foco) -> base 100 Myr -> robustez -> Monte Carlo estagio-3 completo -> MEGNO."
+  ],
+  "jobs": [
+    {
+      "name": "smoke",
+      "cmd": ["{py}", "main.py", "smoke", "--max-workers", "5"],
+      "timeout_s": 1800
+    },
+    {
+      "name": "grid_angle_robustness_1myr",
+      "cmd": ["{py}", "scripts/experiments/run_grid_experiment.py", "configs/experiments/angle_robustness.yaml"],
+      "timeout_s": 7200
+    },
+    {
+      "name": "grid_i_boundary_1myr",
+      "cmd": ["{py}", "scripts/experiments/run_grid_experiment.py", "configs/experiments/i_boundary_scan.yaml"],
+      "timeout_s": 7200
+    },
+    {
+      "name": "screen_quadro2_4gyr",
+      "cmd": ["{py}", "main.py", "screen", "--budget", "configs/budgets/secular.yaml", "--seed", "12345", "--candidates", "data/candidates_quadro2.csv", "--max-workers", "5"],
+      "timeout_s": 108000,
+      "retry_cmd": ["{py}", "main.py", "resume", "--max-workers", "5"],
+      "retry_timeout_s": 108000
+    },
+    {
+      "name": "screen_base_100myr",
+      "cmd": ["{py}", "main.py", "screen", "--budget", "configs/budgets/secular_100myr.yaml", "--seed", "12345", "--max-workers", "5"],
+      "timeout_s": 14400
+    },
+    {
+      "name": "robustness_convergence",
+      "cmd": ["{py}", "main.py", "convergence", "--from-run", "{latest_run}", "--top", "5", "--max-workers", "5"],
+      "timeout_s": 18000
+    },
+    {
+      "name": "robustness_validate_top_ias15",
+      "cmd": ["{py}", "main.py", "validate-top", "--from-run", "{latest_run}", "--top", "3", "--integrator", "ias15", "--max-workers", "5"],
+      "timeout_s": 28800
+    },
+    {
+      "name": "robustness_leave_one_out",
+      "cmd": ["{py}", "main.py", "leave-one-out", "--from-run", "{latest_run}", "--top", "2", "--max-workers", "5"],
+      "timeout_s": 18000
+    },
+    {
+      "name": "robustness_null_models",
+      "cmd": ["{py}", "main.py", "null-models", "--from-run", "{latest_run}", "--top", "3", "--n-shuffles", "20", "--max-workers", "5"],
+      "timeout_s": 21600
+    },
+    {
+      "name": "montecarlo_full_stage3",
+      "cmd": ["{py}", "main.py", "montecarlo-scan", "--config", "configs/montecarlo/parameter_space_full_stage3.yaml", "--max-workers", "5"],
+      "timeout_s": 28800
+    },
+    {
+      "name": "megno_quadro2",
+      "cmd": ["{py}", "scripts/megno_batch.py", "--catalog", "data/candidates_quadro2.csv", "--budget", "configs/budgets/secular_100myr.yaml", "--years", "10000000"],
+      "timeout_s": 14400
+    },
+    {
+      "name": "megno_example",
+      "cmd": ["{py}", "scripts/megno_batch.py", "--catalog", "data/candidates_example.csv", "--budget", "configs/budgets/secular_100myr.yaml", "--years", "10000000"],
+      "timeout_s": 14400
+    }
+  ]
+}
