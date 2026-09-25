@@ -126,6 +126,7 @@ def main() -> int:
             continue
         if args.dry_run:
             print(f"[dry-run]  {candidate.candidate_id}: reconstruiria {series.name}")
+            rebuilt += 1
             continue
 
         backup = None
