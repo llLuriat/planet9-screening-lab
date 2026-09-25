@@ -1131,7 +1131,7 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
     `TASK.md` (B5 → RESOLVIDO + esta entrada). Artefatos da run alterados pelo próprio
     reprocesso (ranking/status/report/séries + backups). **B3 e B4 continuam abertos**;
     nenhum `.docx`/artigo tocado.
-- Commit: `fix(engine): B5 corrigido e run secular recuperada - serie delta_pomega com largura fixa + rebuild a partir do SimulationArchive; 4/5 candidatos de volta ao ranking sem re-integrar (5 testes novos, scripts de rebuild/reprocesso, audit-run OK)`
+- Commit: `1da1078` (código, testes, scripts e TASK.md até esta linha); esta atualização do Log: commit `docs(task)` seguinte.
 - Próximo passo: Auditor adotar o **novo** ranking no artigo (o antigo tem 4 linhas vazias) e decidir B3/B4.
 - PC: C206-EDUC-333
 
