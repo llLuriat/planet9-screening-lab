@@ -1034,4 +1034,17 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
   ad-hoc ficaram fora do repo (`%TEMP%\p9_analyze_run.py`).
 - Commit: `docs(task): verificacao da run secular de 4 Gyr (concluiu 03:31, 4/5 invalidos por bug de CSV ragged) + B5`.
 - PC: C206-EDUC-333
+- **Adendo (medido nos mtimes dos checkpoints, não estimado):** o branch **`with_p9`
+  custou ~7,2–7,3 h**, e não 5,6 h como o `without_p9`. Evidência: as 5 séries
+  `without_p9` pararam às 20:12–20:13 de 24/09 (5,50–5,52 h após o start 14:42:19) e as
+  5 `with_p9` terminaram às 03:22:46–03:30:58 de 25/09 ⇒ 7,16–7,29 h por branch. Janela
+  real da run = **12h49m** (o ETA que publiquei era 11,2–11,7 h ⇒ ~10% otimista).
+  Causa provável: 11 partículas em vez de 10 + encontros próximos com o P9 que fazem o
+  WHFast reduzir `sim.dt` (o mesmo mecanismo que ejeta os ETNOs e dispara o B5).
+- **Consequência para as estimativas do projeto:** o hint de tempo do dashboard/`--budget`
+  é calibrado no benchmark single-core de **10 corpos** (205.180 anos/s) e portanto
+  **subestima branches `with_p9` (~11 corpos + encontros próximos) em ~30%**. Para 4 Gyr,
+  o número honesto por candidato é `~5,5 h (without_p9) + ~7,3 h (with_p9) ≈ 12,8 h`,
+  e não 10,8 h. Sugestão para o Auditor: recalibrar/rotular o benchmark com as duas
+  configurações ou aplicar o fator ~1,33 em branches que incluam o P9.
 
