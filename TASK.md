@@ -347,6 +347,95 @@ acidental) e ` D docs/PLANET9_ARTIGO_v2_ABNT.docx` + `?? docs/archive/PLANET9_AR
 **Nada disso foi commitado, revertido ou movido por mim.** Aguardando decisão do
 Auditor/usuário (ex.: `git add` do move + reverter o espaço do `.gitignore`).
 
+### B5 — A run de 4 Gyr CONCLUIU, mas 4 dos 5 candidatos ficaram INVÁLIDOS por um bug de pós-processamento (`float(None)` lendo CSV ragged) — precisa de decisão do Auditor
+
+Descoberto em 2026-09-25 ao verificar a run `screen_20260924T174217246692Z` (o PC
+apareceu desligado; ver Log desta data). **Resumo: a FÍSICA terminou 100% (as 10
+branches chegaram a t = 4,000 000 000 yr), mas 4 candidatos foram descartados pelo
+pipeline DEPOIS da integração, por um `TypeError` de bookkeeping.**
+
+**O que a run produziu de fato**
+- `status.json`: `status: completed`, `current_stage: completed`,
+  `ended_at 2026-09-25T06:31:05Z`, `candidates_done: 1`, `candidates_failed: 4`,
+  `global_result_status: candidate_of_interest_within_protocol`;
+  `SUCCESS.marker` presente; `python main.py audit-run <run>` → **AUDIT OK**.
+- 10 branches integradas até 4 Gyr (5 `without_p9` + 5 `with_p9`), séries de drift
+  completas e uniformes (4001 amostras × 5 campos por candidato).
+- Único candidato validado: `p9_low_mass_weak` (delta_score 0,159918,
+  `candidate_of_interest`, `evidence_level: exploratory`). Os outros 4 aparecem em
+  `results/ranking.csv` como `failed`/`invalid` com métricas vazias.
+
+**Causa raiz (cadeia completa, com arquivo e linha)**
+1. `metrics.py` L173-184 `delta_pomega_instant()` devolve um dict **apenas com os
+   ETNOs presentes** naquele instante.
+2. `engine.py` L159-172 `_extract_final_orbits()` classifica como perdido
+   (`lost_etnos`, omitido da lista) todo ETNO com `e >= 1` ou `|a| > 5000 AU`.
+3. `engine.py` L390-402: a cada checkpoint o `fieldnames` da série é recalculado a
+   partir das chaves do instante (`fieldnames = ["t_years"] + sorted(instant.keys())`)
+   e a linha é gravada com `csv.DictWriter` — mas o **cabeçalho do arquivo foi
+   fixado pela 1ª iteração (5 colunas: t_years + 4 ETNOs)**. Resultado: linhas
+   **curtas** (2 a 4 campos) misturadas com a largura do cabeçalho → CSV ragged.
+4. `artifacts.py` L45-47 `read_csv_dicts()` = `csv.DictReader` puro, cujo
+   comportamento padrão (`restval=None`) devolve **`None`** para as colunas
+   ausentes em linhas curtas.
+5. `engine.py` L411-415: o filtro só descarta `value == ""` (string vazia), **não
+   descarta `None`** → `float(None)` → `TypeError` → o candidato inteiro vira
+   `failed`, mesmo com a integração de 4 Gyr já concluída e persistida.
+
+**Evidência dura (contagem de ETNOs presentes por amostra nas séries `with_p9`; 4000
+amostras por candidato):**
+| candidato | 4 ETNOs | 3 | 2 | 1 | resultado |
+|---|---|---|---|---|---|
+| p9_low_mass_weak | **4000 (100%)** | 0 | 0 | 0 | ✅ validado (nunca perdeu ETNO) |
+| p9_mid_mass_aligned | 2714 (67,8%) | 747 | 539 | 0 | ❌ `float(None)` |
+| p9_high_mass_family | 964 (24,1%) | 1776 | 1260 | 0 | ❌ `float(None)` |
+| p9_bad_geometry | 496 (12,4%) | 163 | 512 | 2829 | ❌ `float(None)` |
+| p9_inner_unstable | 145 (3,6%) | 844 | 451 | 2560 | ❌ `float(None)` |
+
+A correlação é perfeita: **só escapou o candidato que não ejetou nenhum ETNO**. O
+gatilho é científico (ETNO com `e >= 1` ou `|a| > 5000 AU` em qualquer checkpoint),
+não numérico. `results/numerical_failures.csv` está vazio e o `audit` oficial aprova
+a run — o bug é invisível para as checagens atuais.
+
+**Impacto (importante para o artigo)**
+- O ranking final tem **1 candidato válido e 4 "inválidos" que NÃO são inválidos** —
+  a invalidação é artefato de bookkeeping, não ausência de controle. Se alguém
+  atualizar o artigo/conclusões com esse ranking, publica um resultado **cientificamente
+  errado** (os 4 candidatos "agressivos" — justamente os que *perdem* ETNOs, informação
+  relevante — ficam de fora).
+- A falha ocorre **no fim**, depois de ~11 h de CPU por candidato: o custo é pago e o
+  resultado descartado.
+
+**Recuperação é viável SEM re-integrar (verificado agora)**
+- Os `.bin` em `checkpoints/` **são o estado final**: `rebound.Simulation(<path>)` →
+  `t = 4000000000,22 yr`, `N = 10` (API correta é `Simulation(filename)`, não
+  `from_file()`; formato = SimulationArchive binário).
+- As séries de drift (energia/momento angular) estão completas e uniformes; as séries
+  `delta_pomega` têm as 4000 amostras (só as colunas dos ETNOs perdidos faltam — o que
+  *é* a informação de sobrevivência).
+- `metrics.py` L196-200 `delta_pomega_stability()` já aceita séries de comprimentos
+  diferentes (marca `insufficient_data`), então a correção produz ciência válida.
+- O que **não** existe hoje é um caminho de "reprocessar a partir dos checkpoints":
+  `planet9lab/rescore.py` L18 só relê `results/ranking.csv` (não toca `.bin`/CSVs).
+
+**Opções para o Auditor (não corrigido — é mudança de pipeline)**
+- (a) Correção mínima + reprocesso: tratar `None`/`""` como "ETNO perdido" em
+  `engine.py` L413 **e** fixar o cabeçalho uma única vez com a união dos nomes de ETNO
+  (defesa em profundidade); somado a um caminho de reprocessamento a partir dos
+  `.bin`/CSVs desta run, os 5 candidatos ficam completos em **minutos**, sem re-integrar.
+- (b) Correção mínima + nova run `screen` do zero: resultado garantido, custo ≈ 11 h.
+- (c) Deixar como está: rejeitado do ponto de vista científico (perde-se 80% da run).
+
+**Nada foi alterado por mim**: nenhum `.py`, config, dado ou resultado existente. A
+correção e/ou o reprocesso exigem autorização explícita.
+
+**Fato de infraestrutura relacionado (não afetou a run):** o Event Log do Windows
+registra desligamento **inesperado** (`Event ID 6008`) às **08:08:34 de 25/09** e
+religamento às 13:04. A run havia terminado às **03:31:06** — 4h37 **antes** da queda,
+com todos os artefatos já escritos em disco. Com o B3 aberto, uma queda *durante* a
+integração ainda significaria perder as 11 h (a energia caiu depois, por sorte).
+
+
 
 ---
 
@@ -905,5 +994,44 @@ Auditor/usuário (ex.: `git add` do move + reverter o espaço do `.gitignore`).
   (AC já está com "suspender = nunca") até ~02:30 de 25/09; se desligar, a run precisa ser
   reiniciada do zero.
 - Commit: pendente nesta entrada.
+- PC: C206-EDUC-333
+
+### 2026-09-25 — Cline (Executor) — PC C206-EDUC-333 — Verificação da run secular: CONCLUIU, mas 4/5 candidatos inválidos por bug (B5)
+
+- **Contexto:** usuário relatou encontrar o PC desligado às 13:07. Verifiquei *todos* os
+  artefatos antes de opinar. **A run NÃO foi interrompida: terminou sozinha** em
+  `2026-09-25T06:31:05Z` = **03:31:06 local**, com `SUCCESS.marker`,
+  `status: completed`, `ended_at` preenchido e `python main.py audit-run <run>` →
+  **AUDIT OK**. O Event Log (`Event ID 6008`) mostra desligamento **inesperado às
+  08:08:34 de 25/09** (religamento 13:04) — 4h37 **depois** do fim da run; nenhum
+  artefato foi perdido pela queda. `doctor` roda 100% `[OK]` depois do corte de energia
+  (venv intacto, `runs/latest_run.txt` agora aponta para esta run em D:).
+- **Física: 10 branches completas.** Todas as 5 `without_p9` e as 5 `with_p9`
+  alcançaram **t = 4,000 Gyr**, com séries de drift uniformes (4001 amostras × 5 campos
+  cada) e os `.bin` de estado final carregáveis (`rebound.Simulation(path)` →
+  `t = 4000000000,22 yr`, `N = 10`).
+- **Mas 4 dos 5 candidatos saíram `failed`/`invalid` com métricas vazias**, por
+  `TypeError: float() argument must be a string or a real number, not 'NoneType'`
+  (`audit/crash_log.jsonl` traz o traceback completo: `engine.py` L415, dentro de
+  `run_branch_checkpointed`, **depois** do laço de integração). Só
+  `p9_low_mass_weak` foi validado (`candidate_of_interest`, delta 0,159918,
+  `evidence_level: exploratory`). **Causa raiz, evidência e opções estão no Bloqueio B5**
+  (CSV ragged: ETNOs perdidos omitem colunas → `csv.DictReader` devolve `None` →
+  `float(None)`). Correlação perfeita: o único candidato que **não** ejetou ETNO
+  (100% das amostras com os 4 ETNOs) foi o único que sobreviveu; nos outros, 32%-96%
+  das amostras têm ETNOs faltando.
+- **O que eu NÃO fiz (e por quê):** não alterei nenhum `.py`/config/dado/resultado; não
+  atualizei o artigo; não "consertei" o bug (mudança de pipeline exige autorização
+  explícita, `.clinerules`). Registrei que a recuperação dos 4 candidatos **é viável sem
+  re-integrar** (estado final nos `.bin` + séries completas em disco), mas hoje não
+  existe caminho de reprocessamento (`rescore` só relê `results/ranking.csv`).
+- **Alerta para o artigo:** o ranking desta run tem 1 válido + 4 "inválidos" que não são
+  inválidos. **Nenhuma atualização de artigo/conclusão deve usar este ranking** até a
+  decisão do Auditor em B5.
+- **Gate (fim desta tarefa):** `ruff check .` + `pytest -q` re-executados nesta máquina
+  ociosa — resultado registrado abaixo nesta entrada (ver commit).
+- Arquivos tocados por mim nesta sessão: `TASK.md` (este Log + B5) apenas. Scripts
+  ad-hoc ficaram fora do repo (`%TEMP%\p9_analyze_run.py`).
+- Commit: `docs(task): verificacao da run secular de 4 Gyr (concluiu 03:31, 4/5 invalidos por bug de CSV ragged) + B5`.
 - PC: C206-EDUC-333
 
