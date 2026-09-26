@@ -37,14 +37,17 @@ ossos_efficiency_params:
 # (Bannister et al. 2018, Fig. 1).
 #
 # use_ossos_footprint: false is the DEFAULT ON PURPOSE. The OSSOS 2013A
-# footprint covers only ~0.07% of the celestial sphere, and the synthetic
-# population's sky positions (ra_deg/dec_deg) are uniform-random proxies,
-# NOT orbital-to-sky projections. Auto-enabling this filter would collapse
-# the surviving synthetic sample to a handful of objects, making the
-# resulting R comparison degenerate and silently changing the
-# interpretation of default runs. Enable it explicitly only when the
-# synthetic population carries a true orbital->sky projection (current
-# TODO, see docs/LIMITACOES.md) or when you specifically want to exercise
-# the real-footprint geometry path.
+# footprint covers only ~0.07% of the celestial sphere, so auto-enabling
+# this filter would collapse the surviving synthetic sample to a handful
+# of objects, making the resulting R comparison degenerate and silently
+# changing the interpretation of default runs. There is also a declared
+# epoch tension: the blocks are 2013A pointings while the synthetic sky
+# positions are projected at the catalog epoch 2014-05-23 (see
+# docs/LIMITACOES.md). Since 2026-09-26 the synthetic sky positions
+# (ra_deg/dec_deg) ARE real orbital->sky projections (integrated
+# planet9lab/geometry/sky_projection.py), so enabling this flag now
+# exercises real positions - but the coverage/epoch caveats above still
+# make it opt-in. Enable it explicitly only when you specifically want
+# to exercise the real-footprint geometry path.
 use_ossos_footprint: false
 ossos_footprint_blocks: null

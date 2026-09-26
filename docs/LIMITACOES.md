@@ -131,9 +131,13 @@ mais fracos que a mediano (H=6.5) são penalizados linearmente (−0,12 por
 magnitude); objetos mais brilhantes NÃO são boostados (conservativo). O
 catálogo abrange de Sedna (H=1,50) a objetos em H~8,5, cobrindo a faixa
 real da amostra. Albedo assumido: 0,10 (Sheppard & Trujillo 2016,
-AJ 152:221) para estimativa de diâmetro — marcado como TODO substituir
-por V = H + 5 log10(r·Delta) quando a população sintética passar a
-carregar distância heliocêntrica.
+AJ 152:221) para estimativa de diâmetro — o TODO "substituir por
+V = H + 5 log10(r·Delta) quando a população sintética passar a carregar
+distância heliocêntrica" está RESOLVIDO: as distâncias entram no modelo
+desde a 2ª etapa de 2026-09-07 (abaixo) e, desde a integração de
+2026-09-26, r e Δ derivam da mesma projeção na mesma época (o stand-in
+Δ = r + U(−1, 1) saiu do código). O TODO que permanece é a função de fase
+(ver Limitações).
 
 **Atualização 2026-09-07 (2ª etapa) — modelo com curva OSSOS de eficiência de
 detecção (ias_model: h_prior_from_catalog + ossos_efficiency_params):**
@@ -161,29 +165,34 @@ idêntica à lógica `in_poly > 0` do SurveySimulator) e os sobreviventes ainda
 passam pelo acceptance de Monte Carlo `ossos_filling_factor` (0,9067),
 replicando a lógica do SurveySimulator; o resultado reporta
 `ossos_footprint_mode: real_footprint_polygons`. O padrão permanece
-DESLIGADO (`use_ossos_footprint: false`) porque as posições
-(`ra_deg`, `dec_deg`) da população sintética são proxies uniformes
-aleatórios — não uma projeção orbital→céu real — e o footprint 2013A cobre
-~0,07% da esfera celeste: ativá-lo por padrão colapsaria a amostra sintética
-sobrevivente a um punhado de objetos e tornaria a comparação de R degenerada.
-**Nota (2026-09-13):** o módulo `planet9lab/geometry/sky_projection.py` já
-existe, está testado (9 testes, commit `b831af9`) e implementa a projeção
-orbital→céu real via REBOUND (posição do objeto) + Terra kepleriana (Meeus,
-Astronomical Algorithms 1998, Cap. 25) + rotação eclíptica→equatorial com
-obliquidade IAU 2006 — mas NÃO está integrado ao
-`generate_synthetic_population`/pipeline principal. As populações sintéticas
-continuam usando o proxy uniforme até a integração ser autorizada; o texto
-acima permanece verdadeiro para o estado integrado atual.
+DESLIGADO (`use_ossos_footprint: false` — default **não alterado** na
+integração de 2026-09-26) porque o footprint 2013A cobre ~0,07% da esfera
+celeste: ativá-lo por padrão colapsaria a amostra sintética sobrevivente a
+um punhado de objetos e tornaria a comparação de R degenerada — e há tensão
+de época declarada: os blocos são pointings de 2013A, enquanto as posições
+projetadas usam a época do catálogo 2014-05-23.
+**Estado (2026-09-26):** a integração AUTORIZADA da projeção orbital→céu
+(`planet9lab/geometry/sky_projection.py`, `orbital_elements_to_sky`) no
+`generate_synthetic_population` FOI FEITA nesta rodada: `ra_deg`/`dec_deg`
+são agora projeção real (REBOUND + Terra kepleriana Meeus, Cap. 25 +
+rotação eclíptica→equatorial com obliquidade IAU 2006) na época
+2014-05-23, e `r_au`/`delta_au` derivam da MESMA geometria nessa época (o
+proxy uniforme saiu do código; nenhum caminho residual). Decisões
+(a)–(e), custo medido e números antes×depois do `selection-bias-check`
+estão no Log desta rodada.
 
 **Limitações que impedem tratar isto como confirmação forte (reportar
 sempre junto com o resultado acima, nunca isolado):**
 
-- O modelo continua *angle-only*: profundidade e arco de rastreamento são
-  penalidades independentes dos ângulos do objeto — apenas o fator de
-  cobertura de céu tem dependência angular. Capacidade limitada de gerar
-  clustering artificial; o teste é melhor lido como `este modelo
-  simplificado específico não explica o clustering`, não como `não há
-  viés de seleção`.
+- O modelo continua *essencialmente angle-only*: o arco de rastreamento é
+  penalidade independente dos ângulos do objeto e a cobertura de céu no
+  modo padrão é uniforme (filling factor, sem ponto-em-polígono). Desde a
+  integração de 2026-09-26 a profundidade tem apenas um acoplamento
+  angular FRACO, via Δ geocêntrico da projeção (|obj − Terra| depende da
+  longitude heliocêntrica, que carrega varpi; r depende apenas de M e e).
+  Capacidade limitada de gerar clustering artificial permanece; o teste é
+  melhor lido como `este modelo simplificado específico não explica o
+  clustering`, não como `não há viés de seleção`.
 - A magnitude aparente V = H + 5 log10(r·Δ) não inclui função de fase
   (V = H + 5log10(r·Δ) − 2.5log10(φ(α))) — a população sintética não carrega
   ângulo de fase α. TODO marcado no código.
@@ -203,25 +212,23 @@ sempre junto com o resultado acima, nunca isolado):**
   0,9067; resultados de `selection-bias-check` produzidos antes desta
   correção não são diretamente comparáveis aos posteriores (a amostra
   sintética sobrevivente muda).
-- A população sintética carrega posição no céu (`ra_deg`/`dec_deg`) apenas
-  como **proxy uniforme aleatório** — NÃO é uma projeção orbital→céu real
-  (isso exigiria resolver a equação de Kepler + matrizes de rotação para uma
-  época). Além disso o sorteio é uniforme em declinação, não isotrópico em
-  área (isotrópico seria `sin(dec)` uniforme) — irrelevante enquanto proxy
-  declarado, relevante se o footprint algum dia virar padrão. Por isso o
-  filtro posicional real por bloco é **opt-in** (`use_ossos_footprint: true`;
-  ver Atualização 2026-09-08 acima) e o modo padrão continua sem filtragem
-  posicional. O modo com footprint é geometricamente real, mas
-  astrofisicamente não informativo enquanto a posição for proxy uniforme:
-  ele exercita a geometria do footprint, não mede clustering induzido por
-  viés. **Nota (2026-09-13):** a projeção orbital→céu verdadeira já existe em
-  `planet9lab/geometry/sky_projection.py` (`orbital_elements_to_radec`, 9
-  testes no gate, commit `b831af9`) — REBOUND + Terra kepleriana + rotação IAU
-  2006 — mas **ainda não foi integrada** ao `generate_synthetic_population`
-  do pipeline; até essa integração ser autorizada, o proxy uniforme continua
-  sendo a posição real gerada e, com ele, o modo footprint não mede
-  clustering induzido por viés. Próximo passo (pendente de autorização):
-  integrar `orbital_elements_to_radec` e re-avaliar o modo footprint.
+- A população sintética carrega posição no céu (`ra_deg`/`dec_deg`) como
+  **projeção orbital→céu real** desde a integração autorizada de
+  2026-09-26 (substituindo o proxy uniforme aleatório anterior): cada
+  objeto é projetado com `orbital_elements_to_sky` na época 2014-05-23 e
+  `r_au`/`delta_au` vêm da mesma geometria. O modo com footprint
+  (`use_ossos_footprint: true`, **opt-in**; ver Atualização 2026-09-08
+  acima) exercita agora geometria real sobre posições reais, mas segue
+  **não calibrado para medir clustering induzido por viés** sem as
+  ressalvas seguintes: é uma projeção de época única (cadência e
+  movimento aparente não modelados) e há tensão de época (blocos 2013A ×
+  projeção em 2014-05-23). O modo padrão continua sem filtragem
+  posicional (filling factor uniforme). **Nota (2026-09-26):** a
+  integração pendente desde a nota de 2026-09-13 foi FEITA nesta rodada —
+  ver Log (decisões (a)–(e), custo de projeção medido e números
+  antes×depois do `selection-bias-check`). Próximo passo restante:
+  re-avaliar o modo footprint com posições reais (permanece opt-in;
+  nenhum run longo lançado nesta máquina).
 - Não modela cadência real (DES, OSSOS, etc.).
 - O resultado não deve ser citado como probabilidade de detecção calibrada.
 - `selection-bias-check` desativa o blocker antigo
@@ -235,15 +242,13 @@ sempre junto com o resultado acima, nunca isolado):**
 
 Próximos passos possíveis (fora do escopo deste lote): modelo de
 seleção dependente de magnitude aparente real com função de fase
-(requer ângulo de fase α sintético) e projeção orbital→céu verdadeira para
-tornar o filtro de footprint geométrico real (já implementado como opt-in,
-ver Atualização 2026-09-08) astrofisicamente informativo em vez de apenas
-geométrico. **Nota (2026-09-13):** a projeção orbital→céu já não é item
-futuro — `planet9lab/geometry/sky_projection.py` existe e está testado (9
-testes, commit `b831af9`), pronto para integração; o que falta é a decisão de
-integrá-lo ao `generate_synthetic_population` (substituindo o proxy uniforme
-e em que modo/época) e, depois, re-avaliar o modo footprint. Os demais
-próximos passos acima (função de fase, cadência real) permanecem válidos.
+(requer ângulo de fase α sintético). **Nota (2026-09-26):** a projeção
+orbital→céu foi INTEGRADA nesta rodada (época 2014-05-23, convenção de
+elementos com varpi como variável sob teste e custo medido registrados
+no Log; `use_ossos_footprint` segue opt-in/default OFF); resta
+re-avaliar o modo footprint com posições reais quando houver
+interesse/autorização. Os demais próximos passos acima (função de fase,
+cadência real) permanecem válidos.
 
 ## Atualização V2 (item 2 do plano V1->V2: Monte Carlo / QMC)
 

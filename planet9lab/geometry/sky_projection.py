@@ -54,16 +54,33 @@ def _earth_heliocentric_ecliptic(jd):
     return x, y, z
 
 
-def orbital_elements_to_radec(a_au, e, i_deg, omega_deg, Omega_deg, M_deg, epoch_jd=DEFAULT_EPOCH_JD):
+def orbital_elements_to_sky(a_au, e, i_deg, omega_deg, Omega_deg, M_deg, epoch_jd=DEFAULT_EPOCH_JD):
+    """Full single-epoch sky state: ``(ra_deg, dec_deg, delta_au, r_au)``.
+
+    Same physics pipeline as the module docstring (REBOUND heliocentric
+    ecliptic J2000 -> Earth via Keplerian elements (Meeus, Ch. 25) ->
+    geocentric vector -> IAU 2006 obliquity rotation -> RA/Dec), plus the two
+    distances that are consistent with that SAME geometry at the SAME epoch:
+
+    - ``r_au``   : heliocentric distance of the object, |obj - Sun|.
+    - ``delta_au``: geocentric distance, |obj - Earth|, at ``epoch_jd``.
+
+    Returning the distances alongside RA/Dec lets callers pair apparent
+    magnitudes (V = H + 5 log10(r * Delta)) with the projected position
+    coherently, instead of drawing an independent anomaly/offset for the
+    distances (integrated into ``generate_synthetic_population`` 2026-09-26).
+    """
     sim = rebound.Simulation()
     sim.add(m=1.0)
     sim.add(m=0.0, a=a_au, e=e, inc=math.radians(i_deg), omega=math.radians(omega_deg), Omega=math.radians(Omega_deg), M=math.radians(M_deg))
     p = sim.particles[1]
     x_obj, y_obj, z_obj = p.x, p.y, p.z
+    r_au = math.sqrt(x_obj**2 + y_obj**2 + z_obj**2)
     x_earth, y_earth, z_earth = _earth_heliocentric_ecliptic(epoch_jd)
     x_geo = x_obj - x_earth
     y_geo = y_obj - y_earth
     z_geo = z_obj - z_earth
+    delta_au = math.sqrt(x_geo**2 + y_geo**2 + z_geo**2)
     eps_rad = math.radians(OBLIQUITY_ARCSEC / 3600.0)
     cos_eps = math.cos(eps_rad)
     sin_eps = math.sin(eps_rad)
@@ -73,4 +90,16 @@ def orbital_elements_to_radec(a_au, e, i_deg, omega_deg, Omega_deg, M_deg, epoch
     r = math.sqrt(x_eq**2 + y_eq**2 + z_eq**2)
     ra_deg = math.degrees(math.atan2(y_eq, x_eq)) % 360.0
     dec_deg = math.degrees(math.asin(max(-1.0, min(1.0, z_eq / r))))
+    return ra_deg, dec_deg, delta_au, r_au
+
+
+def orbital_elements_to_radec(a_au, e, i_deg, omega_deg, Omega_deg, M_deg, epoch_jd=DEFAULT_EPOCH_JD):
+    """RA/Dec-only convenience wrapper around :func:`orbital_elements_to_sky`.
+
+    Output is bit-identical to the original implementation (same operation
+    order); the distances are simply discarded here.
+    """
+    ra_deg, dec_deg, _delta_au, _r_au = orbital_elements_to_sky(
+        a_au, e, i_deg, omega_deg, Omega_deg, M_deg, epoch_jd=epoch_jd
+    )
     return ra_deg, dec_deg
