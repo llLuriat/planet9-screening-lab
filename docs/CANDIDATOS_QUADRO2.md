@@ -108,7 +108,7 @@ que é uma limitação diferente (ainda real, não uma opção nova a decidir
 agora).
 
 Referência já adicionada em ordem alfabética na seção REFERÊNCIAS do
-`docs/Artigo_FEBRACE_revisado.docx`.
+`docs/archive/Artigo_FEBRACE_revisado.docx`.
 
 ## Atualização: candidato BB21 rodado (sanidade, 2026-09-03)
 

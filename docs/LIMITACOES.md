@@ -432,7 +432,7 @@ Limitações que continuam de pé mesmo com esses comandos implementados:
 ## Fechamento da tarefa 1 (LIMITACOES + artigo) — 2026-08-15
 
 Reconciliação das três localizações da documentação de limitações/artigo
-(`docs/LIMITACOES.md`, `docs/Artigo_FEBRACE_revisado.docx` e
+(`docs/LIMITACOES.md`, `docs/archive/Artigo_FEBRACE_revisado.docx` e
 `CONSOLIDADO_PLANET9_SCREENING_LAB.md`).
 
 Estado verificado no código e nas runs reais:
