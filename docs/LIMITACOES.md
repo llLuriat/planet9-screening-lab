@@ -81,13 +81,26 @@ FT28, 2015 GT50 — registrados como próximo lote, não implementados.
   do JPL SBDB, catálogo `data/etnos/h_values.csv`). Um modelo de viés
   observacional *completo* continua inexistente.
 - ~~Leave-one-out não é executado.~~ RESOLVIDO: implementado
-  (`python main.py leave-one-out --from-run <run> --top N`); as duas runs reais
-  ainda não o executaram (`leave_one_out_status: not_run`).
+  (`python main.py leave-one-out --from-run <run> --top N`) e **executado em
+  2026-09-26 nesta máquina** na run canônica `screen_20260903T211311606520Z`
+  (top 5; 4 ETNOs — o comando usa o catálogo default `catalog_v2` +
+  `configs/science/etno_selection.yaml`, que seleciona 4 das 5 linhas, não os
+  16 da run): `robustness_score` = 1,0 para os 5 candidatos (4/4 remoções com
+  delta > 0). As demais runs reais continuam sem executá-lo; o campo
+  `leave_one_out_status` do `candidates_results_cache.json` segue `not_run`
+  (os comandos gravam `robustness/` + `report.md` da run — artefato da run;
+  o cache não é editado à mão).
 - Propagação de incerteza não é executada (`uncertainty_propagation_status`).
 - ~~Modelos nulos extras (além do controle com/sem P9) não são executados.~~
   RESOLVIDO: implementados (`python main.py null-models --models
-  shuffle_varpi,randomize_angles,no_p9_catalog_baseline`); as duas runs reais
-  ainda não os executaram.
+  shuffle_varpi,randomize_angles,no_p9_catalog_baseline`) e **executados em
+  2026-09-26 nesta máquina** na run canônica `screen_20260903T211311606520Z`
+  (top 5 × 3 modelos × 20 shuffles = 300 linhas; budget da run 200 anos,
+  `null_model_integration_years: null` = sem sub-orçamento): nenhum dos 5
+  candidatos supera os 3 modelos ao mesmo tempo → blocker
+  `null_model_not_exceeded` adicionado à run (detalhes no bloco "Resultado
+  científico honesto" abaixo). As demais runs reais continuam sem executá-los;
+  `null_models_status` no cache segue `not_run`.
 - Detectabilidade (limites IR/óptico) não é executada (`detectability_status`).
 - ~~MCMC/Monte Carlo real sobre `[M9, a9, e9, i9]` ainda não existe (item 2 do
   plano V1->V2 - próximo bloco a implementar).~~ PARCIAL: amostragem QMC
@@ -106,9 +119,12 @@ FT28, 2015 GT50 — registrados como próximo lote, não implementados.
   (`medium.yaml`, 200 anos, 2026-09-03): `completed`, rank 1,
   `candidate_of_interest`, `evidence_level: weak`, blockers
   `no_observational_bias_model` + `etno_catalog_not_fully_validated`. A escala
-  secular (`secular.yaml`, 4 Gyr) e os itens de robustez V2 (leave-one-out,
-  propagação de incerteza, modelos nulos, convergência, detectabilidade)
-  permanecem `not_run` para este candidato — ver `docs/CANDIDATOS_QUADRO2.md`.
+  secular (`secular.yaml`, 4 Gyr) segue `not_run` para este candidato; dos
+  itens de robustez V2, leave-one-out e modelos nulos foram executados em
+  2026-09-26 (run canônica, top 5 — `robustness_score` 1,0; modelos nulos:
+  blocker `null_model_not_exceeded`), enquanto propagação de incerteza,
+  convergência e detectabilidade permanecem `not_run` — ver
+  `docs/CANDIDATOS_QUADRO2.md`.
 - Rastreabilidade artigo<->run (`article_section_ref`, `export_to_article.py`)
   ainda não existe (item 4). Confirmado ausente no código em 2026-08-15.
 
@@ -394,6 +410,19 @@ nenhum candidato supera consistentemente os três modelos nulos
 tempo. O blocker `null_model_not_exceeded` permanece ativo. Isso não é uma
 falha do pipeline - é exatamente o tipo de resultado negativo honesto que
 esses testes existem para produzir.
+**Atualização 2026-09-26 (execução real, run canônica
+`screen_20260903T211311606520Z`, top 5, 20 shuffles, budget 200 anos):**
+`shuffle_varpi` passou em 4/5 (percentil 100, p_like 0,0476; falhou apenas em
+`p9_row8_bb21_bestfit`, percentil 0), `randomize_angles` passou em 0/5
+(percentis 20-75, p_like 0,286-0,810) e `no_p9_catalog_baseline` passou em
+0/5 (percentil 0, p_like 1,0) — nenhum dos 5 supera os 3 modelos ao mesmo
+tempo, e o blocker `null_model_not_exceeded` foi adicionado à run (efeitos:
+`robustness/*.csv|json` gravados + `report.md` da run regenerado com
+`leave_one_out_status: run` e `null_models_status: run`; o
+`candidates_results_cache.json` não foi editado). Leitura dentro do
+protocolo: triagem exploratória em que nenhum candidato dos 5 se sustenta
+sobre os três modelos nulos — resultado desfavorável, reportado com o mesmo
+peso que um favorável.
 
 Dois bugs reais foram corrigidos durante a fusão:
 
