@@ -1219,3 +1219,63 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
   declaradas, não esquecidas).
 - PC: C206-EDUC-333
 
+### 2026-09-29 19:05Z Cline (Executor) — PC C206-EDUC-333 — Incidente de 3 dias (.venv bloqueado por policy), B6/B7, screen Quadro2 @4Gyr FINALIZADA (8/8 reprovados por perda de ETNOs no ramo with_p9), fila relançada
+
+- **Cronologia do incidente**: a screen de 4 Gyr (lançada 2026-09-25 17:40Z)
+  computou os 8 candidatos e **crashou no finalize** em 2026-09-26T19:22Z com
+  `PermissionError [WinError 5]` ao carregar a DLL do REBOUND — só para gravar
+  `rebound_version` no manifesto (run.py linha do finalize). Todos os
+  candidatos já estavam no `candidates_results_cache.json` (33 KB, gravado
+  19:22:12Z) e marcados `failed`; ranking/report/manifest nunca saíram. O
+  supervisor tentou o retry automático e **o próprio Popen morreu com o mesmo
+  WinError 5**; como o `_run_job` não tratava exceção de spawn, o supervisor
+  caiu com traceback (preservado em
+  `runs/campaign_supervisor/supervisor_err_20260926_crash.log`) e a fila ficou
+  parada **3 dias** (máquina sem reboot, boot 2026-09-25 13:04 local).
+- **Causa raiz**: a partir de ~2026-09-26 19:22, **qualquer execução ou carga
+  de DLL sob `D:\planet9-screening-lab\.venv` passou a ser negada** por
+  policy/AV local — `icacls` mostra "todos os usuários: controle total",
+  `python.exe` íntegro (274 KB), mas executar `python.exe` e carregar
+  `numpy`/`clibrebound` de lá devolve "Acesso negado" (inclusive via Python
+  base com `sys.path` apontando para os site-packages do .venv). Reproduzível
+  em 2026-09-29. **Workaround para a campanha: venv nova em `C:\p9venv`**
+  (`pip install -e`, `doctor` tudo `[OK]`, rebound 5.2.1 real). O `.venv`
+  antigo fica intacto no disco (falha do usuário/IT, fora do escopo do
+  laboratório — reportar).
+- **B6 RESOLVIDO (commit `af2d6c7`)**: `resume_run` não finalizava um run sem
+  pendências cuja finalização morreu no meio (early return "resume_no_pending")
+  — exatamente o buraco que prendia os dados da screen. Agora: sem pendências
+  E sem marker (SUCCESS/INVALID) = finalização pendente → o resume roda o
+  finalize a partir do cache (evento `resume_finalize_only`); com marker
+  gravado continua no-op. Teste novo
+  `test_resume_finalizes_run_that_crashed_during_finalization` (3/3 no
+  arquivo). A screen foi finalizada via `resume runs\screen_20260925T174027769815Z`
+  → **`AUDIT OK`** + `SUCCESS.marker` + ranking/report/manifest completos
+  (ended 2026-09-29T18:56:21Z).
+- **B7 RESOLVIDO (mesmo commit)**: supervisor blindado — falha de spawn
+  (`OSError`/WinError 5) vira código 125 registrado no log do job; erro no
+  loop vira 126; `campaign_jobs.json` momentaneamente inválido → espera 30 s e
+  relê. Relançado sob `C:\p9venv` (`py = sys.executable` resolve para a venv
+  nova → todos os jobs usam o Python que funciona).
+- **Resultado científico da screen @4 Gyr (Quadro 2, BB16/BB21)** —
+  `global_result_status: no_candidate_found`; **8/8 `failed`/`rejected` por
+  `survival_rate_below_threshold`**; todas as perdas de ETNO ocorrem nos ramos
+  **with_p9** (sobrevivência 0,25–0,75 vs 1,0 sem P9,
+  `numerical_health_score_with_p9 = 0,0` em todos). Ranking por Δ:
+  row6_preferred +0,0050 > row1 −0,0235 > row8_bb21 −0,0567 > row5 −0,0862 >
+  row7 −0,1203 > row3 −0,1432 > row2 −0,1458 > row4 −0,2003. Entre os
+  sobreviventes, `R_apsidal` with_p9 sobe (0,43–1,0 vs 0,247 sem P9) — sinal
+  qualitativo presente, mas **contaminado pelas perdas pequeno-N**.
+  **Cautela obrigatória**: as perdas podem ser (a) física (o candidato
+  desestabiliza os ETNOs → candidato errado para o papel) ou (b) numérica
+  (dt/erro acumulado em 4 Gyr); a arbitragem fica com a convergência
+  (dt/2, dt/4) e o IAS15 — imediatamente a seguir na fila. Nenhum claim de
+  física sem isso.
+- **Fila relançada 18:57Z**: `screen_base_100myr` rodando (venv nova);
+  seguem convergence → ias15 → leave-one-out → null models → MC estágio-3 →
+  MEGNO. Gate do commit: py_compile + ruff limpos. A run órfã de 2026-09-24
+  (`screen_20260924T173651761759Z`, sem cache, 0/5) fica **não retomada** de
+  propósito: duplicaria a fila ativa com valor científico menor (catálogo
+  exemplo, não Quadro 2) — retomável a qualquer momento via `resume`.
+- PC: C206-EDUC-333
+
