@@ -1221,6 +1221,13 @@ def resume_run(run_dir: str | Path, max_workers: int | None = None) -> dict:
     candidate config, etc.), not just an interruption. To force a retry,
     delete its entry from candidates_results_cache.json and its row status in
     candidates_status.csv before calling resume.
+
+    B6: um run sem pendências mas sem marker de finalização (SUCCESS/INVALID)
+    ainda NÃO terminou - a finalização pode ter morrido no meio (ex.:
+    2026-09-26, PermissionError ao carregar a DLL do REBOUND só para gravar
+    rebound_version no manifesto). Nesse estado o resume roda a finalização a
+    partir do cache em vez de retornar sem fazer nada, senão ranking/report/
+    manifest nunca são gravados.
     """
     run_dir = Path(run_dir)
     status_path = run_dir / "candidates_status.csv"
@@ -1231,7 +1238,13 @@ def resume_run(run_dir: str | Path, max_workers: int | None = None) -> dict:
     pending = [row["candidate_id"] for row in status_rows if row.get("operational_status") == "pending"]
     append_event(run_dir, "resume_requested", completed=len(completed), pending=len(pending))
 
-    if not pending:
+    # B6: "sem pendências" não implica "finalizado". A finalização é a última
+    # etapa do run e pode morrer no meio, deixando todos os candidatos
+    # terminais e o cache completo, mas sem ranking/report/manifest. Nesse
+    # estado o resume precisa seguir até a finalização; o retorno antecipado
+    # só é seguro quando o marker de finalização já foi gravado.
+    finalized = any((run_dir / marker).exists() for marker in ("SUCCESS.marker", "INVALID.marker"))
+    if not pending and finalized:
         write_json(
             run_dir / "heartbeat.json",
             {
@@ -1245,6 +1258,8 @@ def resume_run(run_dir: str | Path, max_workers: int | None = None) -> dict:
         )
         append_event(run_dir, "resume_no_pending")
         return {"completed": completed, "pending": pending, "message": "No pending candidates."}
+    if not pending:
+        append_event(run_dir, "resume_finalize_only", candidates=len(completed))
 
     manifest_path = run_dir / "audit" / "run_manifest.json"
     config_path = run_dir / "config.resolved.yaml"

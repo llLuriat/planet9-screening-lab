@@ -181,3 +181,53 @@ def test_resume_reconstructs_manifest_for_interrupted_run(tmp_path, fake_rebound
         assert not (run_dir / "RUNNING.lock").exists()
     finally:
         shutil.rmtree(run_dir, ignore_errors=True)
+
+
+def test_resume_finalizes_run_that_crashed_during_finalization(tmp_path, fake_rebound):
+    """B6: cache completo e nenhum pendente, mas run não finalizado (crash no
+    finalize, como o PermissionError de 2026-09-26) -> resume deve CONCLUIR a
+    finalização a partir do cache, sem recomputar candidato nenhum."""
+    import shutil
+
+    from planet9lab import run as run_module
+
+    budget_path = Path("configs/budgets/low.yaml")
+    budget = load_budget(budget_path)
+    candidates = load_candidates("data/candidates_example.csv", budget.max_candidates)
+
+    run_dir = run_module.execute_run(
+        candidates=candidates,
+        budget_path=budget_path,
+        seed=42,
+        command_name="screen",
+        replay_args=["screen", "--budget", str(budget_path), "--seed", "42"],
+        allow_analytical_fallback=False,
+    )
+    try:
+        # Estado do crash no finalize: todos os candidatos terminais no cache
+        # (nada pendente), markers ausentes (só são gravados no fim) e o
+        # status.json ainda em "running"; lock como um crash deixaria.
+        (run_dir / "SUCCESS.marker").unlink(missing_ok=True)
+        (run_dir / "INVALID.marker").unlink(missing_ok=True)
+        status = json.loads((run_dir / "status.json").read_text())
+        status["status"] = "running"
+        status["ended_at"] = None
+        (run_dir / "status.json").write_text(json.dumps(status))
+        (run_dir / "RUNNING.lock").write_text("simulated-crash\n")
+
+        events_before = (run_dir / "events.log").read_text()
+        result = run_module.resume_run(run_dir)
+
+        assert result["pending"] == []
+        delta_events = (run_dir / "events.log").read_text()[len(events_before):]
+        assert '"event": "resume_finalize_only"' in delta_events
+
+        # A finalização realmente rodou: saídas regravadas, marker de volta e
+        # lock removido.
+        assert (run_dir / "results" / "ranking.csv").exists()
+        assert (run_dir / "reports" / "report.md").exists()
+        assert (run_dir / "SUCCESS.marker").exists() or (run_dir / "INVALID.marker").exists()
+        assert not (run_dir / "RUNNING.lock").exists()
+    finally:
+        shutil.rmtree(run_dir, ignore_errors=True)
+

@@ -65,11 +65,21 @@ def _resolve(cmd: list[str], py: str) -> list[str]:
 
 
 def _run_job(cmd: list[str], log_path: Path, timeout_s: int) -> int:
-    """Roda um job com stdout+stderr no log; no timeout mata a árvore inteira."""
+    """Roda um job com stdout+stderr no log; no timeout mata a árvore inteira.
+
+    B7: em 2026-09-26 o Popen em si morreu com PermissionError [WinError 5]
+    (bloqueio de execução do .venv) e derrubou o supervisor inteiro com
+    traceback, deixando a fila parada por dias. Falha de spawn agora é
+    registrada no log do job e devolvida como código 125 — a fila segue viva.
+    """
     with log_path.open("a", encoding="utf-8") as log:
         log.write(f"\n=== {_now()} CMD: {' '.join(cmd)}\n")
         log.flush()
-        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+        except OSError as exc:
+            log.write(f"\n=== {_now()} SPAWN_ERROR {exc!r} — job nao iniciado.\n")
+            return 125
         try:
             return proc.wait(timeout=timeout_s)
         except subprocess.TimeoutExpired:
@@ -93,7 +103,13 @@ def main() -> int:
     done = {name for name, rec in progress.get("jobs", {}).items() if rec.get("status") in {"done", "failed"}}
 
     while True:
-        spec = json.loads(JOBS_FILE.read_text(encoding="utf-8"))
+        try:
+            spec = json.loads(JOBS_FILE.read_text(encoding="utf-8"))
+        except ValueError:
+            # Arquivo sendo editado ao vivo (poda/reordenação) pode ficar
+            # momentaneamente inválido; espera e tenta de novo.
+            time.sleep(30)
+            continue
         pending = [job for job in spec["jobs"] if job["name"] not in done]
         if not pending:
             break
@@ -103,13 +119,20 @@ def main() -> int:
         if job.get("retry_cmd"):
             attempts.append(("retry_resume", job["retry_cmd"], job.get("retry_timeout_s", job["timeout_s"])))
         for kind, cmd_raw, timeout_s in attempts:
-            cmd = _resolve(cmd_raw, py)
             started = _now()
             t0 = time.time()
-            progress["jobs"][name] = {"status": "running", "attempt": kind, "started": started, "cmd": cmd}
-            progress["updated_at"] = _now()
-            _write_progress(progress)
-            code = _run_job(cmd, OUT / f"{name}.log", timeout_s)
+            code = 126
+            try:
+                cmd = _resolve(cmd_raw, py)
+                progress["jobs"][name] = {"status": "running", "attempt": kind, "started": started, "cmd": cmd}
+                progress["updated_at"] = _now()
+                _write_progress(progress)
+                code = _run_job(cmd, OUT / f"{name}.log", timeout_s)
+            except OSError as exc:
+                # B7: nem a montagem do comando nem o spawn podem derrubar o
+                # supervisor; registra e deixa a fila seguir.
+                with (OUT / f"{name}.log").open("a", encoding="utf-8") as log:
+                    log.write(f"\n=== {_now()} SUPERVISOR_ERROR {exc!r}\n")
             record = {
                 "status": "done" if code == 0 else "failed",
                 "attempt": kind,
