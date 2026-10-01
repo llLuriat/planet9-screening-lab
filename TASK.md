@@ -1390,5 +1390,6 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
 - **Admin (passo 7):** `scripts/cache_summary.py` rastreado (ruff limpo — o check do repositório inteiro passou); B3 → "RESOLVIDO (180af40)"; `runs/screen_20260924T173651761759Z` NÃO tocada. Push disparado após o gate verde (sync pré-push `0 15`).
 - Arquivos tocados nesta sessão: `TASK.md` (Log + B3), `scripts/cache_summary.py` (novo, rastreado). **Nenhum artefato de run alterado (leitura apenas).**
 - Próximo passo: decisões pendentes do Auditor (fila MC stage-3/MEGNO parada; ressalvas de proveniência acima).
+- **Adendo (pós-gate): PUSH FALHOU (403).** `git push origin main` foi REJEITADO: `remote: Permission to llLuriat/planet9-screening-lab.git denied to yasminasantana6-svg` + `fatal: ... error: 403` (exit 128). Os 17 commits seguem LOCAIS (sync `0 17`); nada foi enviado. Causa provável: a credencial git desta máquina (identidade `yasminasantana6-svg`) não tem permissão de escrita no repositório. Ação pendente do Auditor: conceder colaboração à conta, configurar credencial com escrita (PAT) nesta máquina, ou fazer o push de uma máquina cuja credencial tem acesso. Nenhuma tentativa de contorno foi feita (credenciais fora do escopo sem autorização).
 - PC: C317-LABS2-018
 
