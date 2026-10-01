@@ -1,0 +1,28 @@
+{
+  "_provenance": "Backup, byte-identico no conteudo, do artefato oficial runs/screen_20260903T211311606520Z/diagnostics/selection_bias.json ANTES da integracao da projecao orbital->ceu (Rodada 2, 2026-09-26). SHA256 do arquivo original, byte-identico a esta copia antes de adicionar esta chave _provenance: 9CE2230DA48BCA9F20E9ACE2A44B552B4B0EE2028B79872A475DD60BF7FF3F50. Origem: %TEMP%/p9_rodada2/selection_bias_OFFICIAL_PRE_RODADA2.json (copia de seguranca tirada antes do comando ANTES da Rodada 2). Contexto antes x depois (mesma run canonica, seed 12345, n=5000): ANTES R_sint=0.032567, sobreviventes 959/5000 (0.1918), R_real=0.299836, real_exceeds_synthetic_R=True; DEPOIS com projecao orbital->ceu real R_sint=0.064584, sobreviventes 221/5000 (0.0442). runs/ e ignorado pelo .gitignore (runs/*/, unica excecao runs/README.md) por isso esta copia versionada vive em docs/hermes/artefatos/. Os numeros ANTES sao os citados no artigo v2.",
+  "bias_model": "h_prior_from_catalog",
+  "caveats": [
+    "Modelo angle-only (omega, Omega, M): nao modela geometria de footprint real nem cadencia real do survey.",
+    "Depth efficiency: OSSOS quadratic-logistic curve (Bannister et al. 2018, ApJS 236:18) evaluated at V = H + 5 log10(r\u00b7Delta) per-object, when distances are available; H-only linear stand-in otherwise.",
+    "Sky coverage: OSSOS filling factor 0.9067 applied as uniform per-object survival probability (0.9067 = mean across 2013A-E and 2013A-O blocks, the default this config may override; Bannister et al. 2016a; angle-only population has no sky-plane position).",
+    "Resultado NAO deve ser citado como probabilidade de deteccao calibrada - e um teste de plausibilidade qualitativo."
+  ],
+  "etno_catalog_path": "data\\etnos\\catalog_validated.csv",
+  "h_prior_source": "data/etnos/h_values.csv",
+  "h_prior_stats": {
+    "h_prior_max": 7.8,
+    "h_prior_mean": 5.9619,
+    "h_prior_median": 6.465,
+    "h_prior_min": 1.5,
+    "h_prior_n": 16
+  },
+  "interpretation": "O catalogo real tem concentracao angular (R) maior que a populacao sintetica sujeita ao mesmo modelo de selecao \u2014 o clustering real NAO e trivialmente explicado por vies de selecao neste modelo simplificado.",
+  "n_real_catalog": 16,
+  "n_synthetic_generated": 5000,
+  "n_synthetic_surviving": 959,
+  "ossos_footprint_mode": "uniform_filling_factor",
+  "real_catalog_resultant_length_R": 0.299836,
+  "real_exceeds_synthetic_R": true,
+  "surviving_fraction": 0.1918,
+  "surviving_synthetic_resultant_length_R": 0.032567
+}

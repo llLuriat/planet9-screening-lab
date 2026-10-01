@@ -4,7 +4,7 @@ description: >-
   unconstrained orientation angle omega_deg of Planet Nine (decision P0).
   Base candidate is Cenario 6 - p9_row6_preferred (M=6, a=500, e=0.35,
   i=20, the article's "Cenario intermediario (preferido)", Secao 8.2 of
-  Artigo_FEBRACE_revisado.docx). omega_deg is swept over a quarter-turn grid
+  docs/archive/Artigo_FEBRACE_revisado.docx). omega_deg is swept over a quarter-turn grid
   that INCLUDES the nominal Fase B value 200 deg so the canonical point is
   always inside the grid; Omega_deg (270) and mean_anomaly_deg (180) stay at
   the fixed Fase B values. omega_deg is the physically dominant angle for

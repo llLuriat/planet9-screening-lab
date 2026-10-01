@@ -281,6 +281,52 @@ def test_server_bind_is_localhost_only(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
+def test_pid_alive_survives_non_utf8_tasklist_output(monkeypatch):
+    """pid_alive não pode quebrar quando o tasklist emite bytes não-UTF-8.
+
+    Regressão real (2026-09-24, PC DESKTOP-DDBU1N8): em Windows com codepage
+    OEM cp850 (pt-BR), o tasklist emite "INFORMAÇÕES:" e nomes de processo
+    com acentos como bytes cp850. Sob PYTHONUTF8=1, subprocess.run(text=True)
+    sem encoding explícito decodifica como UTF-8 e o reader thread morre com
+    UnicodeDecodeError, deixando stdout=None → AttributeError em out.split().
+    Os bytes abaixo são a saída REAL capturada nesta máquina (od -tx1):
+    "INFORMAÇÕES: nenhuma tarefa em execução corresponde..." em cp850.
+    O método só procura um PID numérico — bytes indecodáveis podem ser
+    substituídos sem perda de função.
+    """
+    cp850_info_no_match = (
+        "INFORMAÇÕES: nenhuma tarefa em execução corresponde "
+        "aos critérios especificados."
+    ).encode("cp850")
+    cp850_with_pid = (
+        '"python.exe"                     12345 Console                    1 '
+        "2.048 K"
+    ).encode("cp850")
+
+    class _FakeCompleted:
+        def __init__(self, stdout: str) -> None:
+            self.stdout = stdout
+
+    def _fake_run(args, **kwargs):  # noqa: ANN001, ANN003 - assinatura do run
+        # O contrato do fix: encoding/errors explícitos devem estar presentes
+        # e o decode acontece fora do subprocess.run real (simulado aqui).
+        assert kwargs.get("encoding") == "utf-8", (
+            "pid_alive deve passar encoding='utf-8' explicitamente"
+        )
+        assert kwargs.get("errors") == "replace", (
+            "pid_alive deve passar errors='replace' para tolerar codepage OEM"
+        )
+        raw = cp850_with_pid if "12345" in " ".join(args) else cp850_info_no_match
+        return _FakeCompleted(raw.decode(kwargs["encoding"], kwargs["errors"]))
+
+    monkeypatch.setattr(runner.subprocess, "run", _fake_run)
+
+    # PID presente apesar dos bytes cp850 indecodáveis → True
+    assert runner.pid_alive(12345) is True
+    # Mensagem "nenhuma tarefa..." (PID ausente) → False
+    assert runner.pid_alive(99999) is False
+
+
 def test_runner_refuses_blocked_unknown_and_incomplete_launches():
     with pytest.raises(ValueError, match="não permitido"):
         runner.launch("watch")  # bloqueado (visualização de terminal)

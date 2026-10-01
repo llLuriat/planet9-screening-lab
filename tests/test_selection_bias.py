@@ -484,9 +484,11 @@ def test_apply_selection_function_footprint_rejects_outside_objects():
 
 
 def test_apply_selection_function_without_footprint_keeps_uniform_behavior():
-    """Backward compatibility: with ossos_footprint_blocks None and no sky
-    positions, the (angle-only) population uses the uniform filling-factor
-    survival probability as before the footprint integration."""
+    """Backward compatibility: with ossos_footprint_blocks None, the
+    population (which now always carries projected sky positions, since the
+    2026-09-26 projection integration) uses the uniform filling-factor
+    survival probability as before the footprint integration — projected
+    positions exist but are unused in this mode."""
     population = generate_synthetic_population(random.Random(7), n=200)
     survivors = apply_selection_function(
         population,
@@ -502,9 +504,12 @@ def test_apply_selection_function_without_footprint_keeps_uniform_behavior():
 
 def test_selection_bias_check_default_reports_uniform_filling_mode():
     """The default config (use_ossos_footprint: false) must keep the uniform
-    filling-factor sky model: the footprint is opt-in because the synthetic
-    RA/Dec are uniform-random proxies, not orbital projections, and the OSSOS
-    2013A footprint covers only ~0.07% of the sky."""
+    filling-factor sky model: the footprint stays opt-in because the OSSOS
+    2013A footprint covers only ~0.07% of the sky (it would collapse the
+    surviving sample) and its 2013A pointings predate the 2014-05-23
+    projection epoch. The synthetic RA/Dec themselves are real orbital
+    projections since the 2026-09-26 integration (see
+    tests/test_sky_projection_integration.py)."""
     from planet9lab.loaders import load_etnos
 
     etnos = load_etnos(REAL_ETNO_CATALOG)

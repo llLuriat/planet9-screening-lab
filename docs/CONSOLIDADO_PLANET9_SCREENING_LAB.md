@@ -63,7 +63,7 @@ Itens finais tratados depois:
 
 - `P1-3`: `anti_alignment_score` foi renomeado/documentado como media angular normalizada, preservando compatibilidade e valores publicados.
 - `P2-4`: foi adicionado blocker consultivo para regime de inclinacao nao validado (`i_deg >= 80`), sem invalidar automaticamente a run.
-- `P0-1`: o artigo `docs/Artigo_FEBRACE_revisado.docx` foi reescrito para refletir apenas execucoes reais de 1 Myr, nao resultados seculares/Gyr inexistentes.
+- `P0-1`: o artigo `docs/archive/Artigo_FEBRACE_revisado.docx` foi reescrito para refletir apenas execucoes reais de 1 Myr, nao resultados seculares/Gyr inexistentes.
 - `P1-2`: estabilidade entre seeds permaneceu como limitacao explicita, sem falsa validacao.
 
 Gate final registrado no relatorio do zip:
@@ -281,7 +281,7 @@ Manter como trabalho futuro ate haver run secular real e objetivos de submissao 
 ### 5.8 Fechamento da Tarefa 1 (LIMITACOES + artigo) — 2026-08-15
 
 Reconciliacao das tres localizacoes (`docs/LIMITACOES.md`,
-`docs/Artigo_FEBRACE_revisado.docx`, este CONSOLIDADO):
+`docs/archive/Artigo_FEBRACE_revisado.docx`, este CONSOLIDADO):
 
 - `docs/LIMITACOES.md` atualizado para o estado real: benchmark existe com
   proveniencia sandbox (nao referencia de prazo); leave-one-out, null-models e
@@ -289,7 +289,7 @@ Reconciliacao das tres localizacoes (`docs/LIMITACOES.md`,
   reais); rastreabilidade artigo<->run (item 4) confirmada ausente;
   fechamento registra MEGNO/Rayleigh-Kuiper opcionais e a decisao Categoria B
   de manter threshold ad hoc como default.
-- `docs/Artigo_FEBRACE_revisado.docx`: verificado consistente com as runs reais
+- `docs/archive/Artigo_FEBRACE_revisado.docx`: verificado consistente com as runs reais
   (alega so as duas runs de 1 Myr; Tabela 2 marca "Nao executado"; S9
   qualitativo sobre ω9/Ω9/M0). Sem alteracao de conteudo (qualquer mudanca de
   claim e Categoria B).
@@ -328,7 +328,7 @@ minutos no sandbox de 2 nucleos.
   de "volume restante" (1,0%/0,01%) refletem o limite de capacidade amostral,
   nao eliminacao fisica. Poder estatistico com a amostra reduzida de Estagio 3
   NAO recalculado (mesma honestidade do Rayleigh/Kuiper).
-- Artigo atualizado (`docs/Artigo_FEBRACE_revisado.docx`): Tabela 5 (funil,
+- Artigo atualizado (`docs/archive/Artigo_FEBRACE_revisado.docx`): Tabela 5 (funil,
   docx table index 4) reescrita com os valores reais e nota explicita de
   Estagio 3 com 2 ramos (vs 60 configurados); Seção 7 (paragrafos 44, 46, 47)
   reescrita citando o artefato `runs/montecarlo_20260816T001216569981Z/results/`

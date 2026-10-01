@@ -14,10 +14,22 @@ from .artifacts import (  # noqa: F401 - write_csv reserved for the Step 5c arti
     write_json,
 )
 from .config import load_yaml
+from .geometry.sky_projection import DEFAULT_EPOCH_JD, orbital_elements_to_sky
 from .loaders import ETNORecord, load_etnos, selected_etnos
 from .metrics import normalize_degrees
 from .robustness import merge_blocker, remove_blocker
 from .run import ROOT, append_event, default_paths, read_manifest
+
+# Época da projeção orbital→céu da população sintética (decisão 2026-09-26,
+# integrada nesta rodada): JD 2456800.5 = 2014-05-23T00:00 UTC, a época dos 13
+# objetos validados do catálogo real (De la Fuente Marcos & De la Fuente
+# Marcos 2014, Tabela A1 — campo epoch de data/etnos/catalog_validated.csv;
+# ver docs/LIMITACOES.md). Justificativa: comparar catálogo real e população
+# sintética na MESMA época; é também o DEFAULT_EPOCH_JD já documentado em
+# planet9lab/geometry/sky_projection.py. Tensão declarada: os blocos OSSOS
+# 2013A (opt-in de footprint) antecedem esta época — ver docs/LIMITACOES.md.
+SKY_PROJECTION_EPOCH_JD = DEFAULT_EPOCH_JD
+SKY_PROJECTION_EPOCH_UTC = "2014-05-23"
 
 
 class ObservationalBiasConfig(BaseModel):
@@ -52,9 +64,10 @@ class ObservationalBiasConfig(BaseModel):
     )
     # OSSOS filling_factor: per-block Monte Carlo acceptance probability applied
     # AFTER the point-in-polygon test (Bannister et al. 2016a, survey simulator
-    # logic). Since our synthetic population has no angular position (angle-only),
-    # we use the arithmetic mean of the two 2013A blocks as a single uniform
-    # survival probability: (0.9079 [2013A-E] + 0.9055 [2013A-O]) / 2 = 0.9067.
+    # logic). The default mode deliberately does NOT run the point-in-polygon
+    # test (use_ossos_footprint stays opt-in), so we use the arithmetic mean of
+    # the two 2013A blocks as a single uniform survival probability:
+    # (0.9079 [2013A-E] + 0.9055 [2013A-O]) / 2 = 0.9067.
     # Source: data/etnos/ossos_efficiency_attribution.md (copied verbatim from
     # OSSOS SurveySimulator pointings.list, commit a1fcf1bfc).
     ossos_filling_factor: float = Field(
@@ -67,7 +80,7 @@ class ObservationalBiasConfig(BaseModel):
     )
     use_ossos_footprint: bool = Field(
         default=False,
-        description="When true, selection_bias_check loads the real OSSOS 2013A footprint blocks (planet9lab/data/ossos_2013a_blocks.py, Bannister et al. 2018 Fig. 1) and applies them as a positional point-in-polygon filter, replacing the uniform filling-factor-only sky model. Default false on purpose: the synthetic population's sky positions (ra_deg/dec_deg) are uniform-random proxies, not orbital-to-sky projections, and the OSSOS 2013A footprint covers only ~0.07% of the celestial sphere, so auto-enabling it would collapse the surviving synthetic sample and change the interpretation of every default run without that being declared.",
+        description="When true, selection_bias_check loads the real OSSOS 2013A footprint blocks (planet9lab/data/ossos_2013a_blocks.py, Bannister et al. 2018 Fig. 1) and applies them as a positional point-in-polygon filter over each object's projected sky position, replacing the uniform filling-factor-only sky model. Default false on purpose: the OSSOS 2013A footprint covers only ~0.07% of the celestial sphere, so auto-enabling it would collapse the surviving synthetic sample and change the interpretation of every default run without that being declared; there is also a declared epoch tension (the blocks are 2013A pointings, the projection epoch is 2014-05-23 - see docs/LIMITACOES.md). The synthetic sky positions themselves ARE real orbital->sky projections since 2026-09-26 (generate_synthetic_population).",
     )
     q_prior_catalog_path: str = Field(
         default="data/etnos/catalog_validated.csv",
@@ -150,9 +163,11 @@ _DEFAULT_OSSOS_EFFICIENCY_PARAMS: dict[str, float] = {
 def _depth_prob_from_h(h_value: float, limiting_magnitude_v: float) -> float:
     """Per-object depth probability derived from absolute magnitude H.
 
-    Stand-in for a full distance + phase-function + albedo model: without a
-    heliocentric distance per synthetic object (angle-only population), H is
-    the only brightness handle available. The detection probability is the
+    Stand-in for a full distance + phase-function + albedo model: when a
+    population does not carry a heliocentric distance per synthetic object
+    (hand-built or pre-projection populations; the integrated pipeline now
+    always projects distances, see generate_synthetic_population), H is the
+    only brightness handle available. The detection probability is the
     FIXED base probability (from the survey limiting magnitude) scaled by a
     factor that decreases as the object gets fainter than a reference H.
 
@@ -288,39 +303,52 @@ def generate_synthetic_population(
     n: int,
     h_prior_values: list[float] | None = None,
     q_prior_values: list[float] | None = None,
-    generate_sky_position: bool = False,
+    epoch_jd: float = SKY_PROJECTION_EPOCH_JD,
 ) -> list[dict]:
-    """Uniform-in-angle synthetic ETNO population (Napier et al. 2021 design):
-    omega, Omega, mean_anomaly independently uniform in [0, 360) degrees.
-    Does NOT touch a_au/e/i_deg - this module tests angular selection bias
-    only, not orbit-fitting bias. No REBOUND integration involved.
+    """Synthetic ETNO population under the documented null model, with a REAL
+    orbital→sky projection at a fixed epoch (integration authorized 2026-09-26;
+    replaces both the independent anomaly draw and the uniform-random RA/Dec
+    proxy that lived behind the removed ``generate_sky_position`` flag).
 
-    Each synthetic object carries per-object distances (``r_au``, ``delta_au``)
-    drawn from empirical ranges observed in the real catalog:
+    Angle conventions — every distribution is either cited or explicitly
+    declared a null-model assumption, never invented silently:
 
-    - ``q_au``: perihelion distance drawn (with replacement) from
-      `q_prior_values` when provided; else uniform in [30, 80] AU.
-    - ``a_au`` and ``e``: reconstructed from q by drawing e uniform in
-      [0.5, 0.95] and setting a = q / (1 - e), matching catalog span.
-    - ``r_au``: heliocentric distance from Keplerian equation
-      r = a(1-e^2)/(1+e*cos(nu)), where nu (true anomaly) is uniform in [0, 2*pi).
-    - ``delta_au``: geocentric distance = r_au + rng.uniform(-1.0, 1.0) AU
-      (stand-in for Earth's offset from the Sun; conservative, |Delta-r| <= 1 AU).
+    - ``varpi_deg`` = omega + Omega ~ U(0, 360): the quantity under test
+      (real-catalog apsidal clustering). Uniform is the null hypothesis
+      being tested (Napier et al. 2021 angle-only design, arXiv:2102.05601,
+      §3).
+    - ``omega_deg`` ~ U(0, 360) with ``Omega_deg = (varpi - omega) mod 360``,
+      so omega + Omega = varpi holds EXACTLY for every row: varpi stays the
+      sampled variable and the untested angle stays marginally uniform.
+      DECLARED NULL-MODEL ASSUMPTION: the omega/Omega pairing is not fitted
+      to any data.
+    - ``i_deg``: prograde-isotropic, cos(i) ~ U(0, 1) → i ∈ [0, 90].
+      DECLARED NULL-MODEL ASSUMPTION: random orbital-plane orientation among
+      prograde orbits; prograde-only because all 16 real catalog objects are
+      prograde (data/etnos/catalog_validated.csv, i ≈ 10°–35°). Not a fit.
+    - ``mean_anomaly_deg`` ~ U(0, 360): random orbital phase at the fixed
+      epoch. DECLARED NULL-MODEL ASSUMPTION (standard angle-only null).
+    - ``a_au``/``e``: unchanged — e ~ U(0.5, 0.95) with q drawn from the real
+      catalog prior (``q_prior_values``) when provided.
 
-    When `h_prior_values` is provided (list of real catalog H values, e.g. from
-    ``data/etnos/h_values.csv``), each synthetic object draws an H value with
-    replacement from that list - so the synthetic population replicates the real
-    sample's brightness distribution while its angles stay uniform-random.
-    When None, the population has no H column and the selection function falls
-    back to the angle-only approximation.
+    Geometry (this integration): ``ra_deg``/``dec_deg`` are the real
+    orbital→sky projection from ``orbital_elements_to_sky`` at ``epoch_jd``
+    (REBOUND heliocentric position + Earth via Keplerian elements (Meeus,
+    Astronomical Algorithms, 1998, Ch. 25) + ecliptic→equatorial rotation
+    with the IAU 2006 obliquity), and ``r_au``/``delta_au`` are the
+    heliocentric and geocentric (|obj − Earth|) distances of that SAME
+    geometry at that SAME epoch — apparent magnitude V = H + 5log10(r·Δ) and
+    sky position are now mutually coherent (the old stand-in
+    Δ = r + U(−1, 1) AU is gone).
 
-    When `generate_sky_position` is True, each object also carries a uniform-random
-    sky-plane position (``ra_deg``, ``dec_deg``) on the celestial sphere, used for
-    point-in-polygon footprint filtering. This is NOT a real orbital-to-sky
-    projection (which would require solving Kepler's equation + rotation matrices
-    for a full sky position at a given epoch); uniform-random is sufficient for the
-    footprint test. Generated only when requested to preserve RNG determinism for
-    callers that don't need footprint filtering.
+    Epoch: ``epoch_jd`` defaults to ``SKY_PROJECTION_EPOCH_JD`` = 2456800.5
+    = 2014-05-23, the epoch of the validated real catalog objects (see the
+    constant's provenance note), so real and synthetic positions are
+    compared at the same epoch.
+
+    The projection consumes NO RNG draws (REBOUND is deterministic), so the
+    seeded stream that picks q/e/angles/H is unchanged in size by this
+    integration; determinism (same seed → same population) still holds.
     """
     population: list[dict] = []
     for index in range(n):
@@ -332,26 +360,29 @@ def generate_synthetic_population(
             a_au = rng.uniform(150.0, 1000.0)
             e = rng.uniform(0.5, 0.95)
             q_au = a_au * (1 - e)
-        nu = rng.uniform(0.0, 2 * math.pi)
-        r_au = a_au * (1 - e ** 2) / (1 + e * math.cos(nu))
-        delta_au = r_au + rng.uniform(-1.0, 1.0)
+        varpi = rng.uniform(0, 360)
+        omega = rng.uniform(0, 360)
+        Omega = (varpi - omega) % 360.0
+        mean_anomaly = rng.uniform(0, 360)
+        i_deg = math.degrees(math.acos(rng.uniform(0.0, 1.0)))
+        ra_deg, dec_deg, delta_au, r_au = orbital_elements_to_sky(
+            a_au, e, i_deg, omega, Omega, mean_anomaly, epoch_jd=epoch_jd
+        )
         row = {
             "name": f"synthetic_{index:05d}",
-            "omega_deg": rng.uniform(0, 360),
-            "Omega_deg": rng.uniform(0, 360),
-            "mean_anomaly_deg": rng.uniform(0, 360),
-            "i_deg": rng.uniform(0, 180),
+            "varpi_deg": varpi,
+            "omega_deg": omega,
+            "Omega_deg": Omega,
+            "mean_anomaly_deg": mean_anomaly,
+            "i_deg": i_deg,
             "a_au": a_au,
             "e": e,
             "q_au": q_au,
-            "r_au": max(r_au, 10.0),
-            "delta_au": max(delta_au, 1.0),
+            "r_au": r_au,
+            "delta_au": delta_au,
+            "ra_deg": ra_deg,
+            "dec_deg": dec_deg,
         }
-        if generate_sky_position:
-            # Uniform-random RA/Dec on the celestial sphere, sufficient for the
-            # point-in-polygon footprint test (see docstring).
-            row["ra_deg"] = normalize_degrees(rng.uniform(0, 360))
-            row["dec_deg"] = rng.uniform(-90, 90)
         if h_prior_values:
             row["h_value"] = h_prior_values[rng.randrange(len(h_prior_values))]
         population.append(row)
@@ -388,8 +419,10 @@ def apply_selection_function(
     is used as the uniform per-object survival probability. This is the
     OSSOS Monte Carlo acceptance probability (Bannister et al. 2016a, survey
     simulator logic) applied as a single uniform factor across the synthetic
-    population, since our angle-only population carries no angular position
-    to test against the real OSSOS footprint blocks. The default value is
+    population in the default mode, which deliberately does NOT run the
+    point-in-polygon test against the real OSSOS footprint blocks
+    (``use_ossos_footprint`` is opt-in). The projected sky positions exist
+    in the population but are unused in this mode. The default value is
     the arithmetic mean of the two 2013A blocks: (0.9079 + 0.9055) / 2 =
     0.9067. When ``ossos_filling_factor`` is None, falls back to the
     original uniform sky fraction ``sky_coverage_deg2 / 41253``.
@@ -507,7 +540,6 @@ def selection_bias_check(
         config.n_synthetic,
         h_prior_values=h_values,
         q_prior_values=q_prior_values,
-        generate_sky_position=ossos_footprint_blocks is not None,
     )
     surviving = apply_selection_function(
         synthetic,
@@ -565,6 +597,21 @@ def selection_bias_check(
             if ossos_footprint_blocks is not None
             else "uniform_filling_factor"
         ),
+        "sky_projection": {
+            "method": (
+                "planet9lab.geometry.sky_projection.orbital_elements_to_sky "
+                "(REBOUND heliocentric ecliptic J2000 + Earth via Keplerian elements "
+                "(Meeus, Astronomical Algorithms, 1998, ch. 25) + ecliptic->equatorial "
+                "rotation, IAU 2006 obliquity)"
+            ),
+            "epoch_jd": SKY_PROJECTION_EPOCH_JD,
+            "epoch_utc": SKY_PROJECTION_EPOCH_UTC,
+            "distances": (
+                "r_au and delta_au come from the same projected geometry at the same "
+                "epoch (delta_au = |object - Earth|); replaces the pre-2026-09-26 "
+                "stand-in delta = r + U(-1, 1) AU"
+            ),
+        },
         "n_real_catalog": n_real,
         "n_synthetic_generated": config.n_synthetic,
         "n_synthetic_surviving": len(surviving),
@@ -587,18 +634,18 @@ def selection_bias_check(
             "que deve ser reportada explicitamente, nao suavizada."
         ),
         "caveats": [
-            "Modelo angle-only (omega, Omega, M): "
+            "Modelo essencialmente angle-only (varpi, omega, M uniformes sob modelo nulo; Omega = varpi - omega; i isotropico progrado): "
             + (
-                "real OSSOS 2013A footprint polygons (data/ossos_2013a_blocks.py, Bannister et al. 2018 Fig. 1) are used as a positional filter; the sky-plane position is a uniform-random RA/Dec proxy (ra_deg/dec_deg), not a full orbital-to-sky projection."
+                "real OSSOS 2013A footprint polygons (data/ossos_2013a_blocks.py, Bannister et al. 2018 Fig. 1) are used as a positional filter over each object's projected sky position (orbital->sky projection at epoch 2014-05-23; single-epoch: survey cadence/apparent motion not modeled, and the 2013A blocks predate that epoch - see docs/LIMITACOES.md)."
                 if ossos_footprint_blocks is not None
-                else "nao modela geometria de footprint real nem cadencia real do survey."
+                else "no modo padrao nao ha point-in-polygon de footprint nem cadencia real do survey; a profundidade tem apenas um acoplamento geometrico fraco via r e Delta da projecao na epoca."
             ),
             "Depth efficiency: OSSOS quadratic-logistic curve (Bannister et al. 2018, ApJS 236:18) evaluated at V = H + 5 log10(r·Delta) per-object, when distances are available; H-only linear stand-in otherwise.",
             "Sky coverage: "
             + (
                 f"real point-in-polygon test against OSSOS 2013A footprint blocks; ossos_filling_factor={ff_txt} applied as per-block MC acceptance (0.9067 = mean of 2013A-E/2013A-O, the default this config may override; Bannister et al. 2016a)."
                 if ossos_footprint_blocks is not None
-                else f"OSSOS filling factor {ff_txt} applied as uniform per-object survival probability (0.9067 = mean across 2013A-E and 2013A-O blocks, the default this config may override; Bannister et al. 2016a; angle-only population has no sky-plane position)."
+                else f"OSSOS filling factor {ff_txt} applied as uniform per-object survival probability (0.9067 = mean across 2013A-E and 2013A-O blocks, the default this config may override; Bannister et al. 2016a; posicoes de ceu projetadas existem na populacao mas nao sao usadas neste modo)."
             ),
             "Resultado NAO deve ser citado como probabilidade de deteccao calibrada - e um teste de plausibilidade qualitativo.",
         ],
