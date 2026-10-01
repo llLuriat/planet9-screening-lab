@@ -309,7 +309,7 @@ verificação automatizada pós-edição (nenhum número antigo remanescente).
 **Pendência B2 fechada — nada a fazer nesta seção.**
 
 
-### B3 — `resume` NÃO retoma uma run `screen` INTERROMPIDA (descoberto ao vivo; precisa de decisão do Auditor)
+### B3 — `resume` NÃO retoma uma run `screen` INTERROMPIDA (descoberto ao vivo) — RESOLVIDO (180af40)
 
 Verificado empiricamente em 2026-09-24 nesta máquina. O portão de
 `planet9lab/run.py` (`resume_run`, L1190-1198) exige `audit/run_manifest.json`,
@@ -1373,3 +1373,22 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
   propósito: duplicaria a fila ativa com valor científico menor (catálogo
   exemplo, não Quadro 2) — retomável a qualquer momento via `resume`.
 - PC: C206-EDUC-333
+
+### 2026-10-01 18:44Z Cline (Executor) — PC: C317-LABS2-018 — Sessão autorizada pelo Auditor: Python 3.11.9 + venv C:\p9venv, merge de origin/main (Rodadas 1-3), gate 248, leitura da robustez (100 Myr) e tabela rebound_version; B3 → RESOLVIDO (180af40)
+
+- Status: concluído (os 7 passos foram executados na ordem dada; nenhum passo falhou)
+- **Ambiente (passo 1):** Python 3.11.9 x64 oficial (python.org) instalado por-usuário, sem admin — instalador verificado por MD5 ANTES de instalar: `e8dcd502e34932eebcaf1be056d5cbcd` (bate com o valor fornecido pelo Auditor). Venv NOVA em `C:\p9venv` (a `.venv` de `D:\...\.venv` NÃO foi tocada — segue quebrada nesta máquina por apontar para a base da C206). `pip install -e .` OK; `python main.py doctor` → 100% `[OK]` (REBOUND real, integração mínima funcionou). **Versões literais: Python 3.11.9; rebound 5.2.1; numpy 2.4.6; pandas 3.0.6** (iguais às do `C:\p9venv` da campanha na C206 — comparabilidade preservada).
+- **Git (passos 2-3):** `git config --global --add safe.directory D:/planet9-screening-lab` (por-máquina). `git fetch` real: `origin/main` avançou para `0f6aece` — **9 commits além do último fetch** (a contagem stale dizia 3): Rodadas 1-3 do Hermes/MiMo (PC DESKTOP-DDBU1N8), incluindo a integração do `sky_projection` (`4fd0a0c`, Tarefa B item a) — **vinda do ORIGIN; não foi ação desta sessão**. **Merge `71adad8`** (merge, não rebase: os hashes locais são citados no próprio Log). Conflito único em `TASK.md` — resolvido preservando as duas histórias EM ORDEM CRONOLÓGICA (Hermes 24/09 01:11Z+01:43Z → local C206 24-25/09 → Rodadas 1-3 26/09 → incidente local 29/09). Verificação automatizada da resolução: **0 deleções vs HEAD e vs origin/main; cada entrada exatamente 1×**; backup do estado conflitado em `%TEMP%\TASK.md.conflicted.bak`.
+- **Gate pós-merge (passo 4, literal):** `python -m pytest -q` → **`248 passed in 224.25s (0:03:44)`**; `python -m ruff check .` → **`All checks passed!`**. **NOVO BASELINE = 248** (a expectativa "~237" referia-se ao baseline local; o merge incorporou +11 testes do remoto — `test_sky_projection_integration.py` etc.).
+- **Robustez lida (passo 5, SOMENTE LEITURA; run base `runs/screen_20260929T185737329137Z` — 100 Myr, 5 candidatos do catálogo exemplo; NÃO é a run de 4 Gyr — escopo declarado; sem frase do tipo "confirma/descarta"):**
+  - *Convergence dt/2, dt/4:* sobrevivência de ETNOs = **1,0 em dt, dt/2 e dt/4** para os 5 candidatos (ranking_stability `passed`; delta_spread 0,0121-0,0228; drift de energia cai com dt/2, dt/4 como esperado). Neste horizonte a perda de ETNO não aparece nem no dt fiducial — este estudo NÃO arbitra as perdas `with_p9` observadas a 4 Gyr.
+  - *IAS15 (top 3):* mesmo sinal de Δ nos 3; Δ WHFast×IAS15: 0,235189×0,221502; 0,224202×0,218231; 0,189414×0,168483; sobrevivência 1,0; `validated_preliminarily`.
+  - *Leave-one-out (top 2):* 4/4 remoções passam (`robustness_score` 1,0): `p9_high_mass_family` Δ 0,216573-0,231348 (média 0,223831; σ 0,006194); `p9_mid_mass_aligned` Δ 0,204083-0,231347 (média 0,212885; σ 0,010980); todos `candidate_of_interest`, sobrevivência 1,0 nos dois ramos.
+  - *Null models (`shuffle_varpi`, 20 shuffles, top 3 — único modelo presente nos artefatos desta run):* `p9_high_mass_family` percentil 100 (p_like 0,047619) passed; `p9_mid_mass_aligned` percentil 100 (0,047619) passed; **`p9_low_mass_weak` percentil 60 (p_like 0,428571) failed** → blocker **`null_model_not_exceeded`** gravado no `audit/blockers.json` da run (mtime 30/09 03:20:40). Literais em `robustness/*.{csv,json}`. (Não misturar com a Rodada 3 do origin — run e horizonte diferentes.)
+- **`rebound_version` — todos os 20 `run_manifest.json` (passo 6):** **5.1.1** em 15 manifestos (03/09 ×4, 14/09 ×7, 24/09 ×1, 25/09 smoke+2 experimentos); **5.2.1** em 2 (`screen_20260925T174027769815Z`, `screen_20260929T185737329137Z`); campo **AUSENTE** em 3 manifestos de montecarlo (0816/0903/0930 — versões via `environment.json`: 5.1.1, 5.1.1, 5.2.1).
+  - **Ressalva de proveniência sinalizada:** `screen_20260925T174027769815Z` foi **integrada sob rebound 5.1.1** (`environment.json` de 25/09) e **finalizada sob 5.2.1** (manifest, resume de 29/09) — versões nominalmente diferentes dentro do mesmo run; qualquer comparação 4 Gyr `174217`×`174027` carrega essa ressalva.
+- **Admin (passo 7):** `scripts/cache_summary.py` rastreado (ruff limpo — o check do repositório inteiro passou); B3 → "RESOLVIDO (180af40)"; `runs/screen_20260924T173651761759Z` NÃO tocada. Push disparado após o gate verde (sync pré-push `0 15`).
+- Arquivos tocados nesta sessão: `TASK.md` (Log + B3), `scripts/cache_summary.py` (novo, rastreado). **Nenhum artefato de run alterado (leitura apenas).**
+- Próximo passo: decisões pendentes do Auditor (fila MC stage-3/MEGNO parada; ressalvas de proveniência acima).
+- PC: C317-LABS2-018
+
