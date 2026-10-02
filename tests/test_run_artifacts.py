@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import planet9lab.run as run_module
 from planet9lab.audit import audit_run
@@ -24,6 +25,52 @@ def test_root_copies_stay_in_sync_after_refresh(tmp_path):
         assert (run_dir / canonical).read_bytes() == (run_dir / root_copy).read_bytes(), (
             f"root copy {root_copy} diverged from {canonical} after refresh"
         )
+
+
+def test_data_manifest_records_the_candidate_catalog_actually_used(tmp_path):
+    """`data_manifest.json` must record the candidate catalog the run REALLY used.
+
+    Regression: `run_screen` applied the `--candidates` override to its own local
+    copy of `default_paths()` and then handed the already-loaded candidates to
+    `execute_run`, which called `default_paths()` again and never received the
+    override. `data_manifest["input_files"]` is built from that second dict, so
+    every run launched with `--candidates` recorded the DEFAULT
+    `data/candidates_example.csv` instead of the file it actually read.
+
+    This is a provenance-only defect - `candidates_hash` in `hashes.json` is
+    computed from the loaded candidate objects and was always correct - but it
+    makes the recorded input path wrong, which is exactly the kind of trail the
+    audit chain depends on. Observed on the 4 Gyr run
+    `screen_20260925T174027769815Z`, whose `replay_command.txt` says
+    `--candidates data/candidates_quadro2.csv` while its `data_manifest.json`
+    said `data/candidates_example.csv`.
+    """
+    candidates_path = tmp_path / "candidates_provenance.csv"
+    candidates_path.write_text(
+        "candidate_id,mass_earth,a_au,e,i_deg,omega_deg,Omega_deg,mean_anomaly_deg\n"
+        "p9_provenance_marker,6.0,500,0.25,20,200,270,180\n",
+        encoding="utf-8",
+    )
+    run_dir = run_screen(
+        "configs/budgets/low.yaml",
+        12345,
+        candidate_catalog=str(candidates_path),
+        run_root=tmp_path / "runs",
+    )
+
+    manifest = json.loads((run_dir / "data_manifest.json").read_text(encoding="utf-8"))
+    recorded = Path(manifest["input_files"]["candidate_catalog"])
+    assert recorded.resolve() == candidates_path.resolve(), (
+        "data_manifest.json recorded "
+        f"{recorded} but the run read {candidates_path}"
+    )
+
+    # The replay line must name the same file, so the recorded trail is replayable.
+    replay = (run_dir / "replay_command.txt").read_text(encoding="utf-8")
+    assert str(candidates_path) in replay
+
+    # And the run really did use this catalog: its candidate is the one integrated.
+    assert "p9_provenance_marker" in (run_dir / "candidates_input.csv").read_text(encoding="utf-8")
 
 
 def test_candidate_failure_writes_crash_log_in_parallel_worker(tmp_path, monkeypatch):

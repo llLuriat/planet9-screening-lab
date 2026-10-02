@@ -421,6 +421,7 @@ def run_screen(
         allow_analytical_fallback=allow_analytical_fallback,
         run_root=run_root,
         etno_catalog=etno_catalog,
+        candidate_catalog=candidate_catalog,
         candidates_excluded_capacity_limit=excluded,
         max_workers=max_workers,
     )
@@ -435,12 +436,22 @@ def execute_run(
     allow_analytical_fallback: bool = False,
     run_root: Path | None = None,
     etno_catalog: str | Path | None = None,
+    candidate_catalog: str | Path | None = None,
     candidates_excluded_capacity_limit: list | None = None,
     max_workers: int | None = None,
 ) -> Path:
     paths = default_paths()
     if etno_catalog is not None:
         paths["etno_catalog"] = Path(etno_catalog)
+    # The candidate catalog is applied to `paths` here as well, and not only in
+    # the caller, because `data_manifest["input_files"]` is serialized from this
+    # dict. Without it, a run launched with `--candidates <file>` still recorded
+    # the default `data/candidates_example.csv` as its candidate input, while
+    # `candidates_hash` (computed from the loaded objects) was correct - the
+    # trail pointed at a file the run never read. Provenance only: `candidates`
+    # is loaded by the caller and passed in, so no science changes.
+    if candidate_catalog is not None:
+        paths["candidate_catalog"] = Path(candidate_catalog)
     budget = load_budget(budget_path)
     weights_config = load_yaml(paths["weights_config"])
     protocol = load_yaml(paths["protocol_config"])
