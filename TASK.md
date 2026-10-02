@@ -486,6 +486,40 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
 
 ---
 
+### B6 - Artigo v2: números de viés desatualizados e Tarefa C ainda ausente - PROPOSTA PRONTA, aguardando o Auditor
+
+Registrado em 2026-10-01 pelo Executor. **Nenhum arquivo do artigo foi editado**;
+o `.docx` vigente continua em `docs/PLANET9_ARTIGO_v2_ABNT.docx` (o movimento
+para `docs/archive/` que veio do pendrive foi revertido nesta rodada, por decisão
+do Auditor registrada na instrução desta rodada).
+
+Dois problemas distintos, ambos com material pronto:
+
+**B6.1 - números de viés de seleção desatualizados no artigo v2.** O artigo v2
+cita **R_sint 0,032567 com 959/5000 sobreviventes**, que são os números
+**anteriores** à integração da projeção orbital→céu (Tarefa B item (a), commit
+`4fd0a0c`). O backup versionado do estado ANTES é
+`docs/hermes/artefatos/selection_bias_PRE_SKY_PROJECTION_20260925.json`; o
+resultado atual (R_sint 0,064584 com 221/5000 sobreviventes) está na entrada da
+Rodada 2 do Log. **A proposta de texto substituto está no fim da entrada de Log
+desta rodada**, com o antes × depois e o comando de reprodução. Decisão do
+Auditor: aprova, edita ou rejeita.
+
+**B6.2 - a Tarefa C (4 Gyr) não aparece no artigo.** A run canônica
+`screen_20260925T174027769815Z` retornou `no_candidate_found` (8/8 reprovados,
+16/16 branches a 4 Gyr). A proposta de texto está no fim da entrada de Log desta
+rodada, com as ressalvas de proveniência: commit gerador `026f827d30` não
+empurrado ao origin; REBOUND 5.1.1 na integração × 5.2.1 na finalização; 4 ETNOs
+e não 16; robustez `not_run` nesta run; coexistência com o resultado de 5
+candidatos `candidate_of_interest_within_protocol`, que é de outro conjunto e não
+substitui o Quadro 2; causa das perdas `with_p9` **inconclusiva** sem convergência
+a 4 Gyr.
+
+**B6.3 - por que o Executor não escreveu no artigo.** O passo 6 do procedimento da
+Tarefa C ("NÃO atualizar o artigo sozinho com a conclusão - preparar a atualização
+e sinalizar em Bloqueios que está pronta para revisão do Auditor/usuário") é
+explícito. Por isso a proposta fica aqui, não no `.docx`.
+
 ## Log de execução (só o Executor edita esta seção — sempre APPEND, nunca reescrever entradas antigas)
 
 <!-- Nova entrada abaixo desta linha, formato:
@@ -1393,3 +1427,81 @@ integração ainda significaria perder as 11 h (a energia caiu depois, por sorte
 - **Adendo (pós-gate): PUSH FALHOU (403).** `git push origin main` foi REJEITADO: `remote: Permission to llLuriat/planet9-screening-lab.git denied to yasminasantana6-svg` + `fatal: ... error: 403` (exit 128). Os 17 commits seguem LOCAIS (sync `0 17`); nada foi enviado. Causa provável: a credencial git desta máquina (identidade `yasminasantana6-svg`) não tem permissão de escrita no repositório. Ação pendente do Auditor: conceder colaboração à conta, configurar credencial com escrita (PAT) nesta máquina, ou fazer o push de uma máquina cuja credencial tem acesso. Nenhuma tentativa de contorno foi feita (credenciais fora do escopo sem autorização).
 - PC: C317-LABS2-018
 
+
+### [2026-10-02 01:50Z] Space Bunny Free (Executor) — PC: DESKTOP-DDBU1N8 — Rodada 1: importação da Tarefa C (run de 4 Gyr), benchmark da outra máquina, merge das 18 commits do pendrive, correção de proveniência e arbitragem das perdas com P9
+
+- **Status: concluído** (itens 1 a 11; push registrado no item "Commits e push" abaixo).
+- **Protocolo de início:** HEAD `0f6aece`, branch `main`, `git fetch origin` real, sync `origin/main...main` = **`0 0`**, árvore limpa. Gate inicial literal:
+  `241 passed in 331.06s (0:05:31)` + `All checks passed!`.
+- **Hostname real desta máquina:** `DESKTOP-DDBU1N8` (Windows 10 19045, Xeon E3-1230 V2 @ 3,30 GHz, 8 lcpus, 15,96 GB). Fuso UTC−03:00.
+
+**Item 1 — inventário de mídia (a USB é `E:`, não `D:`).** O caminho literal `D:\ATLETA DO ANO\(pendrive)` **não existe**. Existem **dois** candidatos com conteúdo byte-idêntico: `E:\planet9-screening-lab` (unidade **removível**, label `ESD-ISO`, FAT32 7,48 GB — a mídia USB real) e o espelho `D:\ATLETA DO ANO\pendrive\planet9-screening-lab` (disco fixo, copiado em 2026-10-01 21:22–21:25 com mtimes de arquivo preservados). `E:\(pendrive)\planet9-screening-lab` existe mas só contém `.venv\Lib\` **vazio**. Verificação de equivalência: `git rev-parse fc2abfc` devolve **`fc2abfc4ba774e47d358cc943d15cd37be40adf5` nos dois**, e os SHA-256 de `status.json`, `ranking.csv`, `audit/run_manifest.json`, `audit/blockers.json` e `config.resolved.yaml` da run canônica são **idênticos**. Importado de `E:`; o espelho `D:` ficou intocado. Três clones `_tmp_ossos_survey` existem (`D:\ATLETA DO ANO\`, `D:\ATLETA DO ANO\pendrive\`, `E:\`) — **nenhum tocado**.
+
+**Item 2 — segurança e merge-base.** `git remote add pendrive E:\planet9-screening-lab` + `git fetch pendrive` (leitura); **o `pushurl` foi apontado para um valor inválido de propósito** (`DISABLED-no-push-to-readonly-media`) para que nenhum push alcance a mídia. Branch de segurança `git branch campanha-c206 FETCH_HEAD` → `fc2abfc`, sem tocar a árvore de trabalho. `git merge-base 0f6aece fc2abfc` = **`0f6aece`**, e `merge-base --is-ancestor 0f6aece fc2abfc` → **exit 0** (FF possível); `18` commits adiante, `0` atrás. A working tree do pendrive estava **limpa** — não havia correção local nunca commitada.
+
+**Item 3 — importação dos dados (antes de mexer em código).** `runs/` é ignorado (`.gitignore:37`, `runs/*/`); **nada foi force-added**, `git ls-files runs/` mostra só `runs/README.md`. SHA-256 registrado **antes e depois** de cada arquivo: **392 arquivos copiados, 0 divergências de hash, 0 divergências de contagem, 0 divergências de tamanho**.
+
+| pasta | bytes | arquivos | estado |
+|---|---:|---:|---|
+| `screen_20260925T174027769815Z` | 170.707.532 | 74 | **canônica da Tarefa C** (8 cand. Quadro 2, 16/16 branches, 4e9) |
+| `screen_20260924T174217246692Z` | 107.698.380 | 72 | secundária (5 cand. do catálogo exemplo, 4e9) |
+| `montecarlo_20260930T062042529121Z` | 12.108.798 | 140 | **INTERROMPIDA** (só `run_started`, `RUNNING.lock` obsoleto, sem `status.json`; `stage3_budget = secular_100myr.yaml`) |
+| `screen_20260929T185737329137Z` | 2.798.268 | 68 | base 100 Myr com convergência/IAS15/LOO/modelos nulos |
+| `screen_20260924T173651761759Z` | 383.075 | 18 | **ÓRFÃ** (`status: running`, `ended_at: null`, 0/5, `RUNNING.lock` obsoleto) — **não retomada** |
+| `campaign_supervisor` | 19.525 | 20 | logs + `progress.json` |
+
+Os **16 `.bin`** da run canônica foram copiados (nenhum checkpoint excluído); o mtime mais recente continua 2026-09-26 16:22:08, prova de que nenhum arquivo foi reescrito pela arbitragem do item 7. Hashes-chave da run canônica, idênticos antes e depois: `status.json` `8DA73336…`, `ranking.csv` `47A9654E…`, `audit/run_manifest.json` `3384061969…`, `audit/blockers.json` `9424FF59…`, `config.resolved.yaml` `AA6CEDFF…`, `events.log` `7B5C4077…`, `checkpoints/p9_row2_highmass_close_with_p9.bin` `382BBF32…`.
+
+**Item 4 — benchmark da outra máquina, sem sobrescrever o desta.** `results/hardware_benchmark_C206-EDUC-333.json` (207.967,2243 anos/s, Xeon Model 165, medido 2026-09-24T17:34:51Z) gravado como **`results/hardware_benchmark_PREVIOUS_C206-EDUC-333.json`**, normalizado ao padrão existente. **`results/hardware_benchmark.json` NÃO foi tocado**: SHA-256 `EB41AE60…` idêntico antes e depois, e continua sendo a medição desta máquina (177.615,1612 anos/s, rebound 5.1.1, 2026-09-25T23:49:57Z). O nome não padronizado que o FF trouxe foi removido, restando só o `PREVIOUS_<HOSTNAME>`.
+
+**Item 5 — FAST-FORWARD (com uma falha minha, registrada).** **O primeiro `git merge --ff-only campanha-c206` ABORTOU** (`Diverging branches can't be fast-forwarded`) porque eu tinha commitado o benchmark **antes** do FF, o que dividiu os ramos. Corrigi sem perder nada: `git reset --soft 0f6aece`, desindexei o arquivo (virou untracked), e o FF passou limpo → **`Updating 0f6aece..fc2abfc`, 16 arquivos, +1942/−12**. O que o FF trouxe, verificado item a item: `engine.py` com o **B5** (`_optional_float`, `pomega_fieldnames` fixo, leitor tolerante, `rebuild_delta_pomega_series`), `run.py` com **B3/B6** (`finalized = any(...)`, `resume_finalize_only`), `montecarlo.py` com `stage3_budget` configurável, `configs/budgets/secular_100myr.yaml`, `configs/montecarlo/parameter_space_full_stage3.yaml`, `tests/test_pomega_series_robustness.py`, `tests/test_resume_integration.py`, 6 scripts de infraestrutura, o benchmark da C206 e +540 linhas de `TASK.md`.
+
+**Item 5b — o artigo v2 não fica duplicado.** O FF trouxe um **rename**, não uma duplicata: em `fc2abfc` o artigo v2 está **só** em `docs/archive/PLANET9_ARTIGO_v2_ABNT.docx`. Confirmei que é o **mesmo arquivo** (blob `cf32c5ec9e33f01558779b90702c916af887b077` em `0f6aece:docs/` e em `fc2abfc:docs/archive/`; SHA-256 `CBFEEA14…` nos dois lados) e devolvi o vigente para `docs/` com `git mv`. Estado final: **só** `docs/PLANET9_ARTIGO_v2_ABNT.docx`, nada em `docs/archive/`.
+
+**Item 6 — gate pós-FF.** Literal: **`248 passed in 337.91s (0:05:37)`** + **`All checks passed!`**. 248 = 241 locais + 7 dos 2 arquivos de teste do pendrive — bate com o esperado, e é o que valida a integração do grupo (A).
+
+**Item 7 — defeito de trilha de auditoria (`data_manifest`), CORRIGIDO.** O defeito persistia pós-FF: `run_screen` aplicava o override `--candidates` a uma cópia local de `default_paths()` (L403-405) e entregava a `execute_run` só os candidatos já carregados; `execute_run` chamava `default_paths()` **de novo** (L441) e nunca recebia o override (só `etno_catalog` era repassado), e `data_manifest["input_files"]` é serializado desse segundo dicionário. Efeito: **toda** run lançada com `--candidates` gravava `data/candidates_example.csv` como entrada, mesmo tendo lido outro arquivo — foi o que a run canônica mostrou (`replay_command.txt` diz `--candidates data/candidates_quadro2.csv`, `data_manifest.json` diz `candidates_example.csv`). Correção: `execute_run` passou a receber `candidate_catalog` e a aplicá-lo a `paths`, espelhando o tratamento de `etno_catalog`. **Só proveniência**: `candidates_hash` (calculado dos objetos carregados) sempre esteve correto e a ciência não muda. Teste de regressão `test_data_manifest_records_the_candidate_catalog_actually_used` em `tests/test_run_artifacts.py`: **falhou antes** (`recorded D:\…\data\candidates_example.csv but the run read C:\…\candidates_provenance.csv`) e **passa depois**; 26 testes correlatos OK, ruff limpo. **A run canônica não foi alterada** (hashes reconferidos depois da correção).
+
+**Item 8 — arbitragem das perdas `with_p9`: são FÍSICAS, não numéricas.** Leitura dos 16 `checkpoints/*.bin` (SimulationArchive, REBOUND 5.1.1, `.bin` copiado para `%TEMP%` antes de aberto — nada escrito na run). Critério: o do próprio pipeline (`planet9lab/engine.py` L167-206, gatilho `e >= 1` **ou** `|a| > 5000 AU`, e a falha `nan_or_inf_state` para estado não finito). Evidências:
+1. **Nenhum estado não finito** em nenhum dos 16 arquivos; `a` e `e` finitos; zero ocorrências de `nan_or_inf_state` (a run tem 14 linhas em `results/numerical_failures.csv`, **todas** `lost_or_hyperbolic`, **todas** em `branch=with_p9`).
+2. **Integrais conservadas**: drift relativo de energia entre 1,4e-06 e 2,6e-06 e de momento angular ~4e-10 ao fim de 4 Gyr (WHFast é symplectic; o drift é pequeno e não acumulado).
+3. **`dt` constante em 0,593644 anos** em toda a integração (nunca reduzido) e `exact_finish_time = 0`, com `t_final = 4000000000.2226205` — a integração chegou ao fim exato.
+4. **Estado final de ejeção real**, não garbage: em `p9_row2_highmass_close` com P9, Sedna termina em `r = 1,29e8 AU`, `e = 253`; 2012 VP113 em `r = 3,66e8 AU`, `e = 2016`; 2014 SR349 em `r = 3,86e8 AU`, `e = 2994` — todos com `a < 0`, energia específica heliocêntrica **positiva** e `v` entre **40× e 450×** a velocidade de escape no próprio raio. Em `p9_row8_bb21_bestfit`, 2015 TG387 termina em `r = 6,73e4 AU`, `e = 0,999702` (limiar do gatilho).
+5. **O controle `without_p9` do mesmo candidato mantém os 4 ETNOs ligados** (`survival_rate_without_p9 = 1,00` nos 8), o que atribui a perda à dinâmica do candidato dentro do modelo.
+6. **Os gatilhos disparam ao longo da integração, não no fim**: o primeiro em 3,65e8 anos (9,1% de 4 Gyr, `p9_row2_highmass_close`/Sedna) e o último em 3,51e9 anos (87,9%, `p9_row7_highmass_viable`/2012 VP113). Divergência numérica apareceria no fim, não espalhada.
+
+**Veredito: ejeção hiperbólica física, não divergência/NaN.** **Permanece inconclusivo** se o encontro que iniciou cada ejeção foi resolvido com `dt` suficiente — isso exige convergir `dt/2` e `dt/4` **a 4 Gyr** (e IAS15 no mesmo horizonte), computação de dias e **fora do escopo desta rodada**. A convergência feita na outra máquina em 29-30/09 foi a **100 Myr** e, nesse horizonte, não reproduz perdas (sobrevivência 1,0 em `dt`, `dt/2` e `dt/4` para os 5 candidatos). Observação de ferramental registrada: no REBOUND 5.1.1 o `Simulation.from_simulationarchive` está quebrado (a classe usa `filename=` mas o parâmetro chama `simulationarchive=`) e `snapshot=<int>` no construtor não indexa, então **não** foi possível ler snapshots intermediários pela API pública; o instante de início de cada perda foi obtido da série `delta_pomega` (que é o próprio dado gravado pelo pipeline, com a coluna do ETNO ficando vazia no checkpoint do gatilho).
+
+**Item 9 — `docs/LIMITACOES.md`.** (a) bloco novo "Atualização 2026-10-01 — Tarefa C" com run_id, 8/8, 16/16, 4e9 em todas as branches, `no_candidate_found`, blocker `etno_catalog_not_fully_validated`, seed 12345, 4 ETNOs incluídos, tabela de ranking, e a arbitragem do item 8; (b) **corrigidas** as afirmações desatualizadas: `secular.yaml` está em **4e9** (não 1e8 — o 1e8 vale para o estágio 3 do Monte Carlo, via `secular_100myr.yaml`) e o benchmark em hardware real **não está mais pendente** (177.615,1612 anos/s em `hardware_benchmark.json` + 3 arquivos `PREVIOUS_*`); (c) **versão geradora declarada** (`026f827d30`, rebound 5.1.1 na integração × 5.2.1 na finalização); (d) as **ressalvas (i)-(vi)** da Rodada 0. Nenhuma limitação existente foi apagada.
+
+**Item 10 — `TASK.md`.** Novo bloqueio **B6** (artigo v2: números de viés desatualizados + Tarefa C ausente, proposta pronta, aguardando o Auditor) e esta entrada de Log, em APPEND. **O "Plano vigente" não foi tocado** — em particular o campo "AUTORIZAÇÃO PARA INICIAR" da Tarefa C continua como está, e a sugestão de marcar a Tarefa C como executada fica para o Auditor decidir.
+
+---
+
+#### Transcrição do Log do pendrive (entradas que este repositório não tinha; máquinas C206-EDUC-333 e C317-LABS2-018)
+
+- **24/09 — PC C206-EDUC-333:** Python e Git religados na máquina; **benchmark real daquela máquina: 205.180 anos/s** em janela de 1e6 anos (197.371 em 2e5 anos), com a **primeira medição de 7.944 anos/s descartada explicitamente** por ter rodado concorrente com o `pytest`; projeção 4 Gyr = 5,42 h/branch, 10,83 h/par; gate `pytest 230 passed` + ruff limpo; Tarefa C autorizada e disparada em background (`screen_20260924T173651761759Z`).
+- **24/09 — B3 (achado de robustez, depois RESOLVIDO em `180af40`):** `resume` **não** retoma uma run `screen` interrompida, porque `resume_run` exige `audit/run_manifest.json` e ele só é gravado na **finalização** — os checkpoints ficavam inutilizáveis e a run de 4 Gyr precisaria de uma janela contínua de ~11-13 h. Evidência: `FileNotFoundError: Cannot resume … missing one of audit/run_manifest.json`.
+- **24/09 — taxa reconciliada:** 196.700 anos/s por branch × 5 workers; correção de uma leitura aritmética minha que sugeria 88k anos/s; gate de fim de tarefa `ruff` limpo + `pytest 230 passed in 4m38s`.
+- **25/09 — B5 (RESOLVIDO):** a run `screen_20260924T174217246692Z` **concluiu** (10/10 branches em t = 4e9) mas 4 dos 5 candidatos saíram `failed` por `TypeError: float(None)` — `csv.DictReader` devolvia `None` nas colunas ausentes de um CSV *ragged* gerado porque o cabeçalho da série Δϖ era fixado na 1ª iteração e as linhas seguintes saíam curtas quando um ETNO era ejetado. Correlação perfeita: só escapou o candidato que **não** ejetou ETNO. Recuperado **sem re-integrar** (`rebuild_delta_pomega_series` + `reprocess_run.py` + `resume`), com backups `*.pre_reprocess_20260925T164723Z`; gate `235 passed`. Fato de infraestrutura: **Event ID 6008** (queda de energia às 08:08:34 de 25/09) ocorreu 4h37 **depois** do fim da run.
+- **25/09 — B4 (RESOLVIDO):** o usuário autorizou comitar duas alterações que já existiam sem commit (` M .gitignore` com um espaço a mais, e o `.docx` v2 movido para `docs/archive/` sem `git add`).
+- **25/09 18:00Z — campanha de 48 h autorizada** pelo usuário (12 jobs: smoke, grids 1 Myr, **Quadro2@4Gyr**, base 100 Myr, robustez, MC estágio 3, MEGNO) e `budget secular_100myr.yaml` + `stage3_budget` configurável no `montecarlo.py` (antes hard-coded 4e9).
+- **26/09 ~19:22Z — incidente de 3 dias:** a **finalização** da run Quadro2 morreu com `PermissionError [WinError 5]` ao carregar a DLL do REBOUND, só para gravar `rebound_version` no manifesto; os 8 candidatos já estavam no `candidates_results_cache.json` (gravado 19:22:12Z) e marcados `failed`, mas `ranking`/`report`/`manifest` nunca saíram. Causa raiz: a partir de ~26/09 19:22 **toda execução sob `D:\planet9-screening-lab\.venv` passou a ser negada** por policy/AV local (reprodutível em 29/09); o próprio `Popen` do supervisor morreu com o mesmo `WinError 5` e, como `_run_job` não tratava exceção de spawn, a **fila ficou parada 3 dias**. Workaround: venv nova em `C:\p9venv`.
+- **29/09 18:56Z — B6/B7 (RESOLVIDO em `af2d6c7`) e finalização da Tarefa C:** sem pendências **e** sem marker de finalização passou a significar "finalização pendente" → o `resume` roda o finalize a partir do cache (`resume_finalize_only`); o supervisor deixou de morrer em falha de spawn. `python main.py resume runs\screen_20260925T174027769815Z` → `AUDIT OK` + `SUCCESS.marker` + ranking/report/manifest completos, `ended 2026-09-29T18:56:21Z`. **Resultado: `no_candidate_found`, 8/8 reprovados por perda de ETNOs no ramo `with_p9`** (sobrevivência 0,25-0,75 vs 1,00 sem P9; `numerical_health_score_with_p9 = 0,0` em todos). A pasta órfã `screen_20260924T173651761759Z` ficou ** deliberadamente não retomada** (duplicaria a fila, com valor científico menor: catálogo de exemplo, não Quadro 2).
+- **01/10 — PC C317-LABS2-018:** Python 3.11.9 oficial instalado **sem admin**, com o instalador verificado por **MD5 antes** de instalar (`e8dcd502e34932eebcaf1be056d5cbcd`); venv nova `C:\p9venv` (a `.venv` quebrada **não** foi tocada); `doctor` 100% `[OK]`; versões literais Python 3.11.9 / rebound 5.2.1 / numpy 2.4.6 / pandas 3.0.6. Merge de `origin/main` (`71adad8`, **merge e não rebase**, para os hashes locais continuarem citados no Log); conflito único em `TASK.md`, resolvido preservando as duas histórias **em ordem cronológica**, com verificação automatizada (0 deleções; cada entrada exatamente 1×). Gate pós-merge: **`248 passed in 224.25s (0:03:44)`** + `All checks passed!` (baseline novo = 248, não os ~237 estimados). **Leitura da robustez (só leitura) da run base de 100 Myr** `screen_20260929T185737329137Z` (5 candidatos do catálogo de exemplo, **não** é a run de 4 Gyr): convergência `dt/2` e `dt/4` com sobrevivência 1,0 nos 5; IAS15 concorda no sinal de Δ nos 3 (`validated_preliminarily`); leave-one-out 4/4 remoções aprovadas; **modelos nulos** `shuffle_varpi` passaram em 2/3 e **`p9_low_mass_weak` falhou** (percentil 60, `p_like` 0,428571) → blocker **`null_model_not_exceeded`**. **Tabela de `rebound_version` dos 20 manifestos:** 5.1.1 em 15, 5.2.1 em 2 (as runs Quadro2 e 100 Myr), ausente em 3 de Monte Carlo. **Adendo pós-gate: `git push` REJEITADO com 403** (`remote: Permission to llLuriat/planet9-screening-lab.git denied to yasminasantana6-svg`), os 17 commits ficaram só locais, **sem tentativa de contorno**.
+
+#### Commits e push
+
+`git rev-list --left-right --count origin/main...main` e o resultado do push estão registrados na linha seguinte a esta, após a execução do gate final. **Nada foi force-added**; `runs/` permanece ignorado.
+
+#### Proposta de texto para o artigo v2 (PROPOSTA — o `.docx` NÃO foi editado; sinalizado em B6)
+
+**(P1) Números de viés de seleção — substituir os antigos.** Onde o artigo v2 cita `R_sint = 0,032567` e `959/5000` sobreviventes (18,36% de 5000), substituir por: *"o modelo de viés observacional foi recalculado após a integração da projeção orbital→céu (a posição no céu de cada objeto sintético passa a ser a projeção real da sua órbita numa época fixa, JD 2456800,5 = 2014-05-23, e as distâncias `r` e `Δ` vêm da mesma geometria). Com essa versão o resultado é `R_sint = 0,064584` com `221/5000` sobreviventes (4,42%): o clustering apsidal da população sintética **diminui** frente ao modelo anterior e a fração de sobreviventes cai por um fator ~4,3."* Consequência a declarar no mesmo parágrafo: *"o sinal quantitativo que favorecia o modelo antigo (população sintética mais alinhada que o catálogo real) **não se sustenta** com a projeção real; o resultado passa a ser inconclusivo nesse teste específico."* Fonte auditável: backup do estado anterior em `docs/hermes/artefatos/selection_bias_PRE_SKY_PROJECTION_20260925.json`; número atual e comando de reprodução na entrada da Rodada 2 do Log.
+
+**(P2) Tarefa C — acrescentar um parágrafo de resultado.** *"A execução secular real foi feita no horizonte de 4 Gyr (`integration_years = 4 000 000 000`, `dt = 0,593644 yr` derivado de `P_Júpiter/20`, integrador WHFast, `seed 12345`) sobre os 8 candidatos do Quadro 2, com 4 ETNOs do catálogo validado, cada candidato integrado com e sem P9 (16 branches, todas chegando a `t = 4,000000000 × 10^9 yr`). O resultado é **nenhum candidato encontrado**: os 8 foram reprovados por `survival_rate_below_threshold` (sobrevivência de ETNO entre 0,25 e 0,75 no ramo com P9 contra 1,00 no controle sem P9), com blocker `etno_catalog_not_fully_validated` ativo. A triagem exploratória a 4 Gyr, portanto, não separa BB16 de BB21: nenhum dos 8 merece a etiqueta de candidato de interesse dentro do protocolo."*
+
+**(P3) Ressalvas de proveniência — obrigatórias junto de (P2).** *"A run foi gerada pelo commit `026f827d30`, que não havia sido enviado ao repositório remoto na máquina de execução e só foi integrado a este repositório depois; o mesmo run registra duas pilhas de REBOUND (5.1.1 na integração, 5.2.1 na finalização). A amostra é de **4** ETNOs, não 16, e leave-one-out, modelos nulos, convergência e detectabilidade estão `not_run` **nesta** run — os resultados de robustez disponíveis são de outra run e de outro horizonte (100 Myr) e não devem ser apresentados como se fossem desta. A leitura dos checkpoints indica que as perdas de ETNO no ramo com P9 são ejeções hiperbólicas reais e não falha numérica, mas **a resolução do encontro que as iniciou não foi testada por convergência a 4 Gyr**, o que torna inconclusiva a atribuição física a um candidato específico."*
+
+**(P4) Não misturar os dois resultados a 4 Gyr.** Se o artigo citar também `screen_20260924T174217246692Z` (`candidate_of_interest_within_protocol`, `p9_low_mass_weak` com Δ = +0,159918), declarar que é de **outro conjunto** (5 candidatos do catálogo de exemplo), que o resumo de ranking dele tem `top1_distinctness: flat_ranking` por haver **um único** candidato válido, e que **não substitui** o resultado do Quadro 2.
+
+- PC: DESKTOP-DDBU1N8

@@ -8,12 +8,15 @@ Este projeto não determina a órbita real do Planeta 9.
 
 O que passou a existir de verdade nesta revisão:
 
-- `configs/budgets/secular.yaml`: horizonte de integração em escala Myr (1e8 anos
-  como ponto de partida conservador; NÃO 4e9 ainda - ver abaixo) com timestep
-  derivado fisicamente do período orbital de Júpiter (`P/20`), não um número
-  chutado. A derivação é feita em código
+- `configs/budgets/secular.yaml`: horizonte de integração em escala secular
+  (4e9 anos = 4 Gyr, o valor-alvo do artigo; ver a Atualização 2026-10-01
+  abaixo) com timestep derivado fisicamente do período orbital de Júpiter
+  (`P/20`), não um número chutado. A derivação é feita em código
   (`planet9lab.physics.recommended_timestep_years`) e um teste garante que o
-  YAML não pode divergir silenciosamente dela.
+  YAML não pode divergir silenciosamente dela. O valor de 1e8 anos mentioned
+  noutros blocos deste documento vale para o **estágio 3 do Monte Carlo**, que
+  roda com `configs/budgets/secular_100myr.yaml` — não para o `secular.yaml` nem
+  para a Tarefa C.
 - Checkpointing real: `ReboundEngine.run_branch_checkpointed` salva o estado
   completo da simulação (REBOUND Simulationarchive) e séries de ΔE/E0, ΔL/L0 e
   Δϖ em CSV a cada `checkpoint_interval_years`, e retoma do último checkpoint
@@ -27,22 +30,21 @@ O que passou a existir de verdade nesta revisão:
 
 O que ainda NÃO está resolvido e precisa ser honesto no artigo:
 
-- **`integration_years: 1e8` em `secular.yaml` ainda não foi validado contra o
-  hardware real que vai rodar o pipeline.** `scripts/benchmark_integration_cost.py`
-  existe para medir isso (tempo de parede real por candidato) e, desde a Etapa
-  3 (2026-08-15), grava proveniência explícita no JSON (`cpu_model`,
-  `logical_cpus`, `physical_cores`, `hardware_platform`, `measured_on` e uma
-  nota de que o número vale só para a máquina que o gerou). Foi executado no
-  ambiente sandbox (Intel Xeon @ 2.50 GHz, 2 núcleos) e o resultado está em
-  `results/hardware_benchmark.json` — **marcado como medição de sandbox, não
-  como referência de prazo do artigo**. O benchmark no hardware real do
-  usuário (E3-1230 V2) permanece PENDENTE: rode
-  `python scripts/benchmark_integration_cost.py` nessa máquina e commite o JSON
-  resultante. Enquanto não existir medição na máquina real, `integration_years`
-  é uma escolha conservadora de ponto de partida, não um valor testado. Se ao
-  rodar o benchmark 4e9 anos (ou mesmo 1e9) não couber no orçamento de tempo
-  disponível, o artigo deve reportar o maior valor efetivamente executado, não
-  o valor originalmente pedido.
+- **O horizonte `integration_years` do `secular.yaml` foi validado contra
+  hardware real, e a Tarefa C foi executada de fato em 4 Gyr.** medição na máquina real (E3-1230 V2, PC DESKTOP-DDBU1N8): 177.615,1612 anos/s single-core
+  (`results/hardware_benchmark.json`, 2026-09-25T23:49:57Z) → **6,256 h por
+  branch**, 12,511 h por par, 100,09 h para os 8 candidatos em série. Ver também
+  `results/hardware_benchmark_PREVIOUS_LURIAT.json` (186.157 anos/s, 2026-09-15),
+  `results/hardware_benchmark_PREVIOUS_C206-EDUC-333.json` (207.967 anos/s,
+  2026-09-24) e `results/hardware_benchmark_PREVIOUS_i5-14400.json`. O fator
+  `--max-workers` **não foi medido nesta máquina**: todo número de parede acima
+  de "série" é projeção. O benchmark que existia quando este bloco foi escrito
+  era o do sandbox (Intel Xeon @ 2.50 GHz, 2 núcleos) e está marcado como
+  medição de sandbox, não como referência de prazo do artigo. `python
+  scripts/benchmark_integration_cost.py` é o comando que gera o JSON, com
+  proveniência explícita (`cpu_model`, `logical_cpus`, `physical_cores`,
+  `hardware_platform`, `measured_on` e a nota de que o número vale só para a
+  máquina que o gerou).
 - ~~Catálogo canônico ainda usa fixtures parciais.~~ RESOLVIDO: o catálogo
   default (`data/etnos/catalog.csv`) segue com 4 fixtures, mas existe
   `data/etnos/catalog_validated.csv` (13 ETNOs reais, a>150 UA, q>30 UA, mesma
@@ -528,3 +530,148 @@ config e o run_id, que estão corretos.
   O artigo só os restringe qualitativamente (S9): ω9 ≈ 150°–250° por análises
   de viés, Ω9 no hemisfério sul |b| > 20°, M0 perto do afélio. Variar por linha
   do Quadro 2 é decisão Categoria B, pendente.
+
+---
+
+## Atualização 2026-10-01 — Tarefa C: execução secular real de 4 Gyr (resultado medido)
+
+A Tarefa C foi executada em outra máquina (PC `C206-EDUC-333`, depois
+`C317-LABS2-018`) e as runs foram trazidas para este repositório em
+2026-10-01. Os números abaixo são **os que estão nos artefatos da run**, não
+estimativas. `runs/` é ignorado pelo Git (`.gitignore:37`, `runs/*/`), então
+estes artefatos vivem em disco e não são versionados.
+
+### Run canônica
+
+| item | valor (fonte: arquivo da run) |
+|---|---|
+| `run_id` | `screen_20260925T174027769815Z` |
+| `integration_years` | 4.000.000.000 (4 Gyr) — `config.resolved.yaml` |
+| `timestep_years` | 0,593644 (derivado de `P_Júpiter/20`) — `config.resolved.yaml` |
+| `checkpoint_interval_years` | 1.000.000 — `config.resolved.yaml` |
+| integrador | `whfast`, `seed 12345` (`seed_effect: inert_for_screen_compare_fixed_catalog`) |
+| catálogo de candidatos | `data/candidates_quadro2.csv`, 8 candidatos (Quadro 2) |
+| ETNOs incluídos | **4** — Sedna, 2012 VP113, 2015 TG387, 2014 SR349 (excluído: Pluto) |
+| branches | **16/16** (8 candidatos × com/sem P9), todos os 16 `*_drift_series.csv` terminam em `t_years = 4000000000.2226205` |
+| markers | `SUCCESS.marker` presente (`no_candidate_found`), `status: completed`, `ended_at 2026-09-29T18:56:21Z` |
+| `global_result_status` | **`no_candidate_found`** |
+| blockers | `etno_catalog_not_fully_validated` (severidade `science_limit`) |
+| reprovação | **8/8** candidatos `failed`/`rejected`, todos por `survival_rate_below_threshold` |
+| `evidence_level` | `none` nos 8; `robustness_score`, `p_value_like` e o resumo de ranking são `null`/`not_computed` |
+
+Sobrevivência de ETNO por ramo: `without_p9 = 1,00` nos 8 candidatos;
+`with_p9` entre 0,25 e 0,75 (limiar do protocolo: `min_survival_rate 0,8`).
+`results/numerical_failures.csv` tem 14 linhas, **todas** em `branch=with_p9`,
+todas com falha `<ETNO>:lost_or_hyperbolic`; `numerical_health_score_with_p9 = 0,0`
+nos 8. Nenhuma ocorrência de `nan_or_inf_state`.
+
+Ranking por `delta_dynamic_score` (todos muito abaixo de
+`min_delta_of_interest = 0,08`): `p9_row6_preferred` +0,005041 ·
+`p9_row1_lowmass_close` −0,023479 · `p9_row8_bb21_bestfit` −0,056698 ·
+`p9_row5_partial_alignment` −0,086169 · `p9_row7_highmass_viable` −0,120256 ·
+`p9_row3_far_eccentric` −0,143201 · `p9_row2_highmass_close` −0,145805 ·
+`p9_row4_incl_boundary` −0,200339. `results/top_candidates.csv` está vazio (2
+bytes). Entre os candidatos reprovados, `apsidal_clustering_R` com P9 chega a
+0,25–1,00 contra 0,247 no controle; esse valor é calculado sobre 1–3 ETNOs
+sobreviventes e **não** é evidência de alinhamento — os candidatos estão
+`rejected`.
+
+Leitura dentro do protocolo: triagem exploratória em que **nenhum candidato foi
+encontrado** a 4 Gyr para o conjunto do Quadro 2. Os oito candidatos foram
+reprovados, não "não avaliados".
+
+### Versão de código e ambiente que geraram a run
+
+- **Commit gerador: `026f827d30748ccc7d8c778030e6eadb3d98207f`**, registrado em
+  `environment.json` (escrito no início da run). `audit/run_manifest.json`
+  registra `19f945e1a24af465523e628179f0860bb1ca3b4c` — commit de documentação
+  de ~1 h depois, gravado em 2026-09-29 durante a finalização por `resume`.
+- **REBOUND 5.1.1 na integração × 5.2.1 na finalização.** `environment.json`
+  registra rebound 5.1.1 / numpy 2.4.6 / pandas 3.0.5 / Python 3.11.9;
+  `audit/run_manifest.json` registra rebound 5.2.1 / pandas 3.0.6. São duas pilhas
+  no mesmo run. O `.venv` desta máquina (PC DESKTOP-DDBU1N8) tem rebound 5.1.1 /
+  numpy 2.4.6 / pandas 3.0.5, ou seja, o mesmo ambiente da integração.
+- **Nenhum dos dois commits existia no `origin`**: os 18 commits da campanha
+  ficaram só na máquina de origem (o push foi rejeitado com 403 por falta de
+  permissão de escrita). Vieram para cá por merge local em 2026-10-01.
+
+### Arbitragem das perdas de ETNO no ramo `with_p9` (leitura de checkpoints, sem re-integrar)
+
+Inspeção do estado final nos 16 arquivos `checkpoints/*.bin` (SimulationArchive,
+REBOUND 5.1.1), com o gatilho do próprio pipeline (`planet9lab/engine.py`
+L187: `e >= 1` ou `|a| > 5000 AU`):
+
+- **Nenhum estado não finito.** Nenhuma falha `nan_or_inf_state`; `a` e `e` finitos
+  em todos os 16 arquivos.
+- **Conservação dos integrais**: drift relativo de energia entre 1,4e-06 e
+  2,6e-06, e de momento angular ~4e-10, ao fim de 4 Gyr. A integração é
+  symplectic (WHFast) e o drift é pequeno e não acumulado — o integrador não
+  divergiu.
+- **`dt` constante em 0,593644 anos** ao longo de toda a integração (nunca
+  reduzido) e `exact_finish_time = 0` com `t_final = 4.000.000.000,2226205`.
+- **Os ETNOs perdidos estão em órbitas hiperbólicas reais**: por exemplo, em
+  `p9_row2_highmass_close` com P9, Sedna termina em `r = 1,29e8 AU`, `e = 253`;
+  2012 VP113, `r = 3,66e8 AU`, `e = 2016`; 2014 SR349, `r = 3,86e8 AU`,
+  `e = 2994` — todos com `a < 0`, energia específica heliocêntrica positiva e
+  `v` entre 40× e 450× a velocidade de escape no respectivo raio. É dispersão
+  gravitacional com conservação de energia, não estouro numérico.
+- **O controle `without_p9` do mesmo candidato mantém os 4 ETNOs ligados**
+  (`survival_rate_without_p9 = 1,00` nos 8), o que atribui a perda à dinâmica do
+  candidato dentro do modelo.
+- **Os gatilhos disparam ao longo da integração, não no fim**: o primeiro
+  início em 3,65e8 anos (9,1% de 4 Gyr) e o último em 3,51e9 anos (87,9%). Um
+  artefato de divergência apareceria no fim.
+
+**Veredito**: as perdas são **físicas** — ejeção hiperbólica real de ETNO pelo
+ramo com P9 — e **não** divergência ou NaN do integrador. **Permanece
+inconclusivo** se o encontro que iniciou cada ejeção foi resolvido com `dt`
+suficiente: arbitrar isso exige convergir `dt/2` e `dt/4` **a 4 Gyr** (e
+validação IAS15 no mesmo horizonte), que é computação de dias e está fora do
+escopo desta rodada. A convergência executada em 2026-09-29/30 na outra máquina
+foi a **100 Myr** e, nesse horizonte, não reproduz perdas. Portanto: nenhuma
+afirmação física sobre qual candidato é o responsável pela ejeção.
+
+### Ressalvas para o artigo
+
+1. **Código não empurrado ao `origin`.** A run foi gerada por `026f827d30`, que
+   só existia localmente na outra máquina. As 18 commits entraram neste
+   repositório por merge local em 2026-10-01, não por `git push`.
+2. **Duas pilhas de REBOUND no mesmo run** (5.1.1 integrando, 5.2.1 finalizando).
+   Qualquer comparação entre esta run e outra deve declarar qual REBOUND
+   gravou os números.
+3. **4 ETNOs, não 16.** `included_etno_count = 4`; Pluto excluído. O leave-one-out
+   desta máquina usa os 4 ETNOs default, não os 16 da run.
+4. **Robustez `not_run` nesta run**: `leave_one_out_status`,
+   `uncertainty_propagation_status`, `null_models_status`, `convergence_status` e
+   `detectability_status` estão `not_run`. Convergência (100 Myr), IAS15,
+   leave-one-out e modelos nulos existem apenas para a run base de 100 Myr
+   (`screen_20260929T185737329137Z`, 5 candidatos do catálogo de exemplo), que é
+   outro horizonte e outro conjunto — não misturar.
+5. **Dois resultados a 4 Gyr com status oposto; não misturá-los.**
+   - `screen_20260925T174027769815Z` (Quadro 2, 8 candidatos):
+     `no_candidate_found`. **É a Tarefa C e o número canônico.**
+   - `screen_20260924T174217246692Z` (5 candidatos do catálogo de exemplo):
+     `candidate_of_interest_within_protocol`, com `p9_low_mass_weak`
+     `Δ = +0,159918`. O resumo de ranking dessa run é `top1_percentile 100` com
+     `top1_distinctness: flat_ranking` porque **só um** dos cinco candidatos é
+     válido — é um resultado mais fraco, de outro conjunto, e não substitui o
+     Quadro 2.
+6. **Causa das perdas `with_p9` inconclusiva** (ver a arbitragem acima): o
+   estado final é de ejeção física, mas a resolução do encontro iniciador não
+   foi testada por convergência a 4 Gyr.
+
+### Defeito de proveniência corrigido nesta mesma rodada
+
+`data_manifest.json` da run registra
+`input_files.candidate_catalog = data/candidates_example.csv`, enquanto
+`replay_command.txt` e `candidates_input.csv` mostram que a run leu
+`data/candidates_quadro2.csv`. Causa: `run_screen` aplicava o override
+`--candidates` a uma cópia local de `default_paths()` e entregava a
+`execute_run` apenas os candidatos já carregados; `execute_run` chamava
+`default_paths()` de novo e nunca recebia o override, e
+`data_manifest["input_files"]` é serializado desse segundo dicionário.
+`candidates_hash` (calculado dos objetos carregados) sempre esteve correto, e a
+ciência não muda — o defeito era só o caminho registrado. **A run canônica foi
+mantida intacta** (SHA-256 dos artefatos conferidos antes e depois da
+importação); a correção vale para as próximas runs, com teste de regressão em
+`tests/test_run_artifacts.py`.
